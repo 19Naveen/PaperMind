@@ -5,12 +5,13 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 import app.schemas as s
 from app.db import DB
+from app.errors import ApiError, Code
 from app.llm import get_providers
 from app.models import (
     Case,
@@ -92,15 +93,16 @@ def load_run(db: Session, run_id: uuid.UUID) -> Run:
         .where(Run.id == run_id)
     )
     if run is None:
-        raise HTTPException(404, "run not found")
+        raise ApiError(Code.RUN_NOT_FOUND, "Run not found.", 404)
     return run
 
 
+# Plain `def`: every call below is synchronous DB I/O (CLAUDE.md §3.2).
 @router.post("", response_model=s.RunOut, status_code=201)
-async def create_run(body: s.RunCreate, background: BackgroundTasks, db: DB) -> s.RunOut:
+def create_run(body: s.RunCreate, background: BackgroundTasks, db: DB) -> s.RunOut:
     pv = db.get(PackVersion, body.pack_version_id)
     if pv is None:
-        raise HTTPException(404, "pack version not found")
+        raise ApiError(Code.PACK_VERSION_NOT_FOUND, "Pack version not found.", 404)
 
     run = Run(
         pack_version_id=pv.id,
@@ -118,7 +120,12 @@ async def create_run(body: s.RunCreate, background: BackgroundTasks, db: DB) -> 
         for document_id in cin.document_ids:
             doc = db.get(Document, document_id)
             if doc is None:
-                raise HTTPException(404, f"document {document_id} not found")
+                raise ApiError(
+                    Code.DOCUMENT_NOT_FOUND,
+                    "One of the selected documents no longer exists.",
+                    404,
+                    {"document_id": str(document_id)},
+                )
             db.add(RunDocument(run_id=run.id, case_id=case.id, document_id=doc.id, doc_type=None))
 
     db.commit()
@@ -137,10 +144,10 @@ def append_correction(run_id: uuid.UUID, body: s.CorrectionCreate, db: DB) -> s.
     """Append a correction. It never mutates the fact — corrections are written, not applied."""
     run = db.get(Run, run_id)
     if run is None:
-        raise HTTPException(404, "run not found")
+        raise ApiError(Code.RUN_NOT_FOUND, "Run not found.", 404)
     fact = db.get(Fact, body.fact_id)
     if fact is None or fact.run_id != run_id:
-        raise HTTPException(404, "fact not found in this run")
+        raise ApiError(Code.FACT_NOT_FOUND, "That fact is not part of this run.", 404)
     corr = Correction(
         run_id=run_id, fact_id=body.fact_id, user_value=body.user_value, note=body.note
     )

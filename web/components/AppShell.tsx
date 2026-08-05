@@ -1,13 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 import { IconChevronDown, IconCheck, IconHome, IconLibrary, IconPlus, IconSettings, IconUser } from '@/lib/icons';
-import type { Workspace } from '@/lib/types';
-import { AuthProvider, useAuth } from './auth/AuthProvider';
+import type { User, WorkspaceOut } from '@/lib/api';
+import { signOutAction } from '@/lib/session';
+import { AuthProvider, initialsOf, useAuth } from './auth/AuthProvider';
 
-function packLabel(workspace: Workspace): string {
+function packLabel(workspace: WorkspaceOut): string {
   return workspace.pack_name && workspace.pack_version
     ? `${workspace.pack_name} ${workspace.pack_version}`
     : 'No pack';
@@ -15,8 +16,7 @@ function packLabel(workspace: Workspace): string {
 
 /** Sidebar footer: the signed-in reviewer's identity, opening onto Profile/Settings/Sign out. */
 function AccountMenu() {
-  const { user, signOut } = useAuth();
-  const router = useRouter();
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
 
   if (!user) {
@@ -30,12 +30,6 @@ function AccountMenu() {
         </Link>
       </div>
     );
-  }
-
-  function handleSignOut() {
-    setOpen(false);
-    signOut();
-    router.push('/login');
   }
 
   return (
@@ -61,13 +55,15 @@ function AccountMenu() {
             <IconSettings width={14} height={14} className="text-ink-3" />
             Settings
           </Link>
-          <button
-            type="button"
-            onClick={handleSignOut}
-            className="flex w-full items-center gap-2 border-t border-rule px-3 py-2 text-left text-[12px] text-missing hover:bg-missing-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
-          >
-            Sign out
-          </button>
+          {/* A Server Action: the session cookie is httpOnly, so only the server can drop it. */}
+          <form action={signOutAction} className="contents">
+            <button
+              type="submit"
+              className="flex w-full items-center gap-2 border-t border-rule px-3 py-2 text-left text-[12px] text-missing hover:bg-missing-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
+            >
+              Sign out
+            </button>
+          </form>
         </div>
       )}
       <button
@@ -77,7 +73,7 @@ function AccountMenu() {
         aria-controls="account-menu"
         className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-ink/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
       >
-        <span className="grid size-7 shrink-0 place-items-center bg-ink font-data text-[10px] font-bold text-ground">{user.initials}</span>
+        <span className="grid size-7 shrink-0 place-items-center bg-ink font-data text-[10px] font-bold text-ground">{initialsOf(user.name)}</span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[12px] font-medium text-ink">{user.name}</span>
           <span className="block truncate text-[11px] text-ink-3">{user.role === 'admin' ? 'Admin' : 'Examiner'}</span>
@@ -126,7 +122,7 @@ function Brand() {
   );
 }
 
-function HomeRail({ workspaces, pathname }: { workspaces: Workspace[]; pathname: string }) {
+function HomeRail({ workspaces, pathname }: { workspaces: WorkspaceOut[]; pathname: string }) {
   return (
     <>
       <nav className="border-y border-rule py-1.5" aria-label="Main navigation">
@@ -169,11 +165,10 @@ function HomeRail({ workspaces, pathname }: { workspaces: Workspace[]; pathname:
   );
 }
 
-function WorkspaceRail({ workspace, workspaces, pathname }: { workspace: Workspace; workspaces: Workspace[]; pathname: string }) {
+function WorkspaceRail({ workspace, workspaces, pathname }: { workspace: WorkspaceOut; workspaces: WorkspaceOut[]; pathname: string }) {
   const [isSwitcherOpen, setIsSwitcherOpen] = useState(false);
   const overviewHref = `/workspace/${workspace.id}`;
   const packHref = `${overviewHref}/pack`;
-  const newSessionHref = workspace.id === 'onb' ? '/workspace/onb/sessions/nord' : overviewHref;
 
   return (
     <>
@@ -227,39 +222,25 @@ function WorkspaceRail({ workspace, workspaces, pathname }: { workspace: Workspa
         <div className="flex items-center justify-between px-4 pb-2">
           <h2 id="sessions-label" className="text-[10px] font-medium uppercase tracking-[0.1em] text-ink-3">Sessions</h2>
           <Link
-            href={newSessionHref}
+            href={overviewHref}
             className="inline-flex size-5 items-center justify-center border border-rule text-ink-2 transition-colors hover:border-accent hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             aria-label="New session"
           >
             <IconPlus width={13} height={13} />
           </Link>
         </div>
-        <nav aria-label="Workspace sessions">
-          {workspace.sessions.map((session) => {
-            const href = `${overviewHref}/sessions/${session.id}`;
-            const active = pathname === href;
-            return (
-              <Link
-                key={session.id}
-                href={href}
-                aria-current={active ? 'page' : undefined}
-                className="group flex items-stretch transition-colors hover:bg-ink/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
-              >
-                <span className={`w-[3px] shrink-0 ${active ? 'bg-accent' : 'bg-transparent'}`} />
-                <span className="min-w-0 flex-1 px-3.5 py-2">
-                  <span className={`block truncate text-[13px] ${active ? 'font-medium text-ink' : 'text-ink-2 group-hover:text-ink'}`}>{session.title}</span>
-                  {session.meta && <span className="block truncate pt-0.5 font-data text-[10.5px] text-ink-3">{session.meta}</span>}
-                </span>
-              </Link>
-            );
-          })}
-        </nav>
+        {/* ponytail: per-session sidebar nav needs the workspace's full session
+            list, which only the overview page fetches — link there instead of
+            re-fetching per workspace at the root layout. */}
+        <Link href={overviewHref} className="block px-4 py-2 text-[13px] text-ink-2 hover:text-ink">
+          {workspace.session_count} session{workspace.session_count === 1 ? '' : 's'}
+        </Link>
       </section>
     </>
   );
 }
 
-function MobileHeader({ workspace, pathname }: { workspace?: Workspace; pathname: string }) {
+function MobileHeader({ workspace, pathname }: { workspace?: WorkspaceOut; pathname: string }) {
   const isWorkspace = workspace !== undefined;
   const overviewHref = workspace ? `/workspace/${workspace.id}` : '/';
   const packHref = workspace ? `${overviewHref}/pack` : '/marketplace';
@@ -289,16 +270,25 @@ function MobileHeader({ workspace, pathname }: { workspace?: Workspace; pathname
   );
 }
 
-export function AppShell({ workspaces, children }: { workspaces: Workspace[]; children: ReactNode }) {
+export function AppShell({
+  workspaces,
+  user,
+  children,
+}: {
+  workspaces: WorkspaceOut[];
+  user: User | null;
+  children: ReactNode;
+}) {
   const pathname = usePathname();
   const isAuthRoute = pathname === '/login' || pathname === '/signup';
   const workspaceId = pathname.match(/^\/workspace\/([^/]+)/)?.[1];
   const workspace = workspaceId ? workspaces.find((item) => item.id === workspaceId) : undefined;
 
-  if (isAuthRoute) return <AuthProvider>{children}</AuthProvider>;
+  // The auth screens stand alone — no rail, no account chip.
+  if (isAuthRoute) return children;
 
   return (
-    <AuthProvider>
+    <AuthProvider user={user}>
       <div className="flex min-h-screen bg-ground text-ink">
         <aside className="hidden h-screen w-[266px] shrink-0 flex-col border-r border-rule bg-surface md:flex">
           <Brand />

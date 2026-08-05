@@ -5,7 +5,45 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { Card, CardHeader, EmptyState, PageHeader } from '@/components/ui';
 import { IconSettings } from '@/lib/icons';
-import { DEFAULT_PREFERENCES, getClientPreferences, setClientPreferences, type Preferences } from '@/lib/session';
+
+/**
+ * Notification preferences are browser-local until the API grows an endpoint for
+ * them; they moved here from the deleted mock session store because this page is
+ * their only consumer. Every access is guarded so SSR and a full storage quota
+ * both stay silent.
+ */
+interface Preferences {
+  emailDigest: boolean;
+  runNotifications: boolean;
+}
+
+const DEFAULT_PREFERENCES: Preferences = { emailDigest: true, runNotifications: true };
+const PREFS_KEY = 'pm:preferences';
+
+function getClientPreferences(): Preferences {
+  if (typeof window === 'undefined') return DEFAULT_PREFERENCES;
+  try {
+    const raw = window.localStorage.getItem(PREFS_KEY);
+    if (!raw) return DEFAULT_PREFERENCES;
+    const parsed = JSON.parse(raw) as Partial<Preferences>;
+    return {
+      emailDigest: typeof parsed.emailDigest === 'boolean' ? parsed.emailDigest : DEFAULT_PREFERENCES.emailDigest,
+      runNotifications:
+        typeof parsed.runNotifications === 'boolean' ? parsed.runNotifications : DEFAULT_PREFERENCES.runNotifications,
+    };
+  } catch {
+    return DEFAULT_PREFERENCES;
+  }
+}
+
+function setClientPreferences(p: Preferences): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(PREFS_KEY, JSON.stringify(p));
+  } catch {
+    // Storage unavailable or full — the setting just won't persist across reloads.
+  }
+}
 
 function Toggle({ label, description, checked, onChange }: { label: string; description: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (

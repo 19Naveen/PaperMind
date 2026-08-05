@@ -19,5 +19,24 @@ services:
       timeout: 5s
       retries: 10
 
+  # Test database. tests/conftest.py binds to 5433/papermind_test.
+  db-test:
+    image: pgvector/pgvector:pg16
+    container_name: papermind-db-test
+    environment:
+      POSTGRES_USER: papermind
+      POSTGRES_PASSWORD: papermind
+      POSTGRES_DB: papermind_test
+    ports:
+      - "5433:5432"
+    volumes:
+      - papermind_pgdata_test:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U papermind -d papermind_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 volumes:
   papermind_pgdata:
+  papermind_pgdata_test:

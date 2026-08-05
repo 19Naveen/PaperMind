@@ -202,3 +202,78 @@ class StudioSessionOut(BaseModel):
 class StudioDraftOut(BaseModel):
     session_id: uuid.UUID
     draft: PackSpec
+
+
+# ---------------------------------------------------------------------------
+# Identity
+# ---------------------------------------------------------------------------
+class UserOut(BaseModel):
+    id: uuid.UUID
+    email: str
+    name: str
+    role: str
+
+
+class SignupIn(BaseModel):
+    # `str`, not EmailStr: pydantic's email type needs the `email-validator` package, and
+    # this module stays dependency-free. Real address validation belongs at signup anyway.
+    email: str = Field(min_length=3)
+    name: str = Field(min_length=1)
+    password: str = Field(min_length=8)
+
+
+class LoginIn(BaseModel):
+    email: str = Field(min_length=3)
+    password: str = Field(min_length=1)
+
+
+# ---------------------------------------------------------------------------
+# Workspaces — mirrors web/lib/types.ts Workspace / WorkspaceSession.
+# ---------------------------------------------------------------------------
+class WorkspaceCreate(BaseModel):
+    name: str = Field(min_length=1)
+    goal: str = ""
+
+
+class PackAssetOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    meta: str | None
+
+
+class WorkspaceSessionOut(BaseModel):
+    id: uuid.UUID
+    title: str
+    status: str
+    run_id: uuid.UUID | None
+    subject: str | None
+    messages: list[dict[str, object]]
+    created_at: datetime
+    updated_at: datetime
+
+
+class WorkspaceOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    goal: str
+    pack_id: uuid.UUID | None
+    pack_name: str | None
+    pack_version: int | None
+    session_count: int
+    updated_at: datetime
+
+
+class WorkspaceDetailOut(WorkspaceOut):
+    sessions: list[WorkspaceSessionOut]
+    assets: list[PackAssetOut]
+
+
+class SessionCreate(BaseModel):
+    title: str = Field(min_length=1)
+    subject: str | None = None
+
+
+class SessionUpdate(BaseModel):
+    title: str | None = None
+    subject: str | None = None
+    status: str | None = None

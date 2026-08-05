@@ -1,53 +1,39 @@
 'use client';
 
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useMemo } from 'react';
 import type { ReactNode } from 'react';
-import type { User } from '@/lib/session';
-import { getClientUser, setClientUser } from '@/lib/session';
-
-interface AuthState {
-  user: User | null;
-  signIn: (u: User) => void;
-  signOut: () => void;
-}
-
-const AuthContext = createContext<AuthState | null>(null);
+import type { User } from '@/lib/api';
 
 /**
- * One shared auth store for the whole shell. Mounted inside AppShell (a client
- * component) so the header account chip, the sidebar footer readout, and the
- * profile page all read the same mock identity. Mirrors to localStorage.
+ * The server-resolved identity, shared with every client component under the
+ * shell. There is no client-side store: the root layout resolves the user from
+ * the httpOnly session cookie and passes it down as a prop, so the header chip,
+ * the profile page and the settings page can never disagree with the server.
+ *
+ * Signing out is a Server Action (`signOutAction`), not a context method — the
+ * cookie only exists on the server.
  */
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+const AuthContext = createContext<{ user: User | null } | null>(null);
 
-  // One-time read from localStorage (an external system) after mount, so SSR
-  // and the first client render agree on the signed-out state first — exactly
-  // the "sync with an external system" case an effect exists for, not a
-  // subscription.
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => setUser(getClientUser()), []);
-
-  const value = useMemo<AuthState>(
-    () => ({
-      user,
-      signIn: (u: User) => {
-        setUser(u);
-        setClientUser(u);
-      },
-      signOut: () => {
-        setUser(null);
-        setClientUser(null);
-      },
-    }),
-    [user],
-  );
-
+export function AuthProvider({ user, children }: { user: User | null; children: ReactNode }) {
+  const value = useMemo(() => ({ user }), [user]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-export function useAuth(): AuthState {
+export function useAuth(): { user: User | null } {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth must be used within <AuthProvider>');
   return ctx;
+}
+
+/** Two-letter monogram for the avatar chip — the API returns a name, not initials. */
+export function initialsOf(name: string): string {
+  return (
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? '')
+      .join('') || '?'
+  );
 }

@@ -71,6 +71,9 @@ class PackVersion(Base):
 
     pack: Mapped[Pack] = relationship(back_populates="versions")
     runs: Mapped[list[Run]] = relationship(back_populates="pack_version")
+    assets: Mapped[list[PackAsset]] = relationship(
+        back_populates="pack_version", cascade="all, delete-orphan"
+    )
 
 
 class Run(Base):
@@ -295,6 +298,104 @@ class StudioSession(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
+class User(Base):
+    """An identity. Roles are a CheckConstraint rather than a lookup table: two values that
+    the authorization code branches on directly gain nothing from a join."""
+
+    __tablename__ = "users"
+    __table_args__ = (CheckConstraint("role IN ('examiner','admin')", name="ck_users_role"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_uuid)
+    email: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    password_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    role: Mapped[str] = mapped_column(Text, nullable=False, server_default="examiner")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    workspaces: Mapped[list[Workspace]] = relationship(
+        back_populates="owner", cascade="all, delete-orphan"
+    )
+
+
+class Workspace(Base):
+    """A business objective and the one Pack that serves it. The 1:1 Workspace->Pack rule is
+    a UNIQUE on pack_id — a constraint the DB enforces, not a convention route code remembers."""
+
+    __tablename__ = "workspaces"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_uuid)
+    owner_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    goal: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
+    # Nullable: a workspace is authored before its Pack is frozen. Unique: at most one
+    # workspace may claim a given Pack.
+    pack_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("packs.id", ondelete="SET NULL"), unique=True, nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    owner: Mapped[User] = relationship(back_populates="workspaces")
+    sessions: Mapped[list[WorkspaceSession]] = relationship(
+        back_populates="workspace", cascade="all, delete-orphan"
+    )
+
+
+class WorkspaceSession(Base):
+    """A conversation *about* a run. It exists before the run does — which is why run_id is
+    nullable and 'draft' is a status the runs table has no equivalent for."""
+
+    __tablename__ = "workspace_sessions"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('draft','pending','running','complete','failed')",
+            name="ck_workspace_sessions_status",
+        ),
+        Index("ix_workspace_sessions_workspace_created", "workspace_id", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_uuid)
+    workspace_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False
+    )
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    run_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("runs.id", ondelete="SET NULL"), nullable=True
+    )
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="draft")
+    messages: Mapped[list[dict[str, object]]] = mapped_column(JSONB, nullable=False, default=list)
+    subject: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    workspace: Mapped[Workspace] = relationship(back_populates="sessions")
+
+
+class PackAsset(Base):
+    """A template or policy file a spec references. Hung off pack_versions, not packs: a Pack
+    whose template file can change underneath it is not reproducible, so assets are frozen
+    with the version that cites them."""
+
+    __tablename__ = "pack_assets"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_uuid)
+    pack_version_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("pack_versions.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    blob_path: Mapped[str] = mapped_column(Text, nullable=False)
+    meta: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    pack_version: Mapped[PackVersion] = relationship(back_populates="assets")
 
 
 TRIGGERS_SQL_SOURCE = """

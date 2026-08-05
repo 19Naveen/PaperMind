@@ -1,19 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/components/auth/AuthProvider';
+import { initialsOf, useAuth } from '@/components/auth/AuthProvider';
 import { ActionButton, Avatar, Card, CardHeader, EmptyState, Kv, PageHeader, Pill, Stat } from '@/components/ui';
 import { IconUser } from '@/lib/icons';
+import { signOutAction } from '@/lib/session';
 
 export default function ProfilePage() {
-  const { user, signOut } = useAuth();
-  const router = useRouter();
-
-  function handleSignOut() {
-    signOut();
-    router.push('/login');
-  }
+  const { user } = useAuth();
 
   if (!user) {
     return (
@@ -43,11 +37,13 @@ export default function ProfilePage() {
       <PageHeader
         eyebrow="Account"
         title="Profile"
-        meta={<span className="font-data text-[11.5px] text-ink-3">reviewer identity · mock session</span>}
+        meta={<span className="font-data text-[11.5px] text-ink-3">reviewer identity · {user.id}</span>}
         actions={
-          <ActionButton variant="danger" onClick={handleSignOut}>
-            Sign out
-          </ActionButton>
+          <form action={signOutAction}>
+            <ActionButton variant="danger" type="submit">
+              Sign out
+            </ActionButton>
+          </form>
         }
       />
 
@@ -55,7 +51,7 @@ export default function ProfilePage() {
         <div className="space-y-3">
           <Card>
             <div className="flex items-center gap-4">
-              <Avatar initials={user.initials} className="h-12 w-12 text-[15px]" />
+              <Avatar initials={initialsOf(user.name)} className="h-12 w-12 text-[15px]" />
               <div className="min-w-0 flex-1">
                 <p className="display text-[18px] leading-tight text-ink">{user.name}</p>
                 <p className="mt-0.5 truncate font-data text-[12px] text-ink-2">{user.email}</p>

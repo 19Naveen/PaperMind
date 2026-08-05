@@ -7,12 +7,13 @@ import json
 import uuid
 from collections.abc import Iterator
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 import app.schemas as s
 from app.db import DB
+from app.errors import ApiError, Code
 from app.llm import JSON_SCHEMA, get_providers
 from app.models import StudioSession
 from app.runtime import preview_document
@@ -183,7 +184,7 @@ def create_session(body: s.StudioSessionCreate, db: DB) -> s.StudioSessionOut:
 def get_session(session_id: uuid.UUID, db: DB) -> s.StudioSessionOut:
     session = db.get(StudioSession, session_id)
     if session is None:
-        raise HTTPException(404, "studio session not found")
+        raise ApiError(Code.STUDIO_SESSION_NOT_FOUND, "Studio session not found.", 404)
     return _session_out(session)
 
 
@@ -191,7 +192,7 @@ def get_session(session_id: uuid.UUID, db: DB) -> s.StudioSessionOut:
 def send_message(session_id: uuid.UUID, db: DB, body: s.StudioMessage) -> StreamingResponse:
     session = db.get(StudioSession, session_id)
     if session is None:
-        raise HTTPException(404, "studio session not found")
+        raise ApiError(Code.STUDIO_SESSION_NOT_FOUND, "Studio session not found.", 404)
 
     session.messages = [*session.messages, {"role": "user", "content": body.text}]
     db.commit()
@@ -233,8 +234,10 @@ def _assistant_tokens(session: StudioSession, user_text: str) -> list[str]:
 def preview_session(session_id: uuid.UUID, body: s.StudioPreview, db: DB) -> s.StudioPreviewOut:
     draft = get_draft(db, session_id)
     if draft is None:
-        raise HTTPException(409, "session has no draft to preview yet")
+        raise ApiError(
+            Code.STUDIO_DRAFT_NOT_FOUND, "This session has no draft to preview yet.", 409
+        )
     if not body.document_ids:
-        raise HTTPException(422, "at least one document_id is required")
+        raise ApiError(Code.VALIDATION_ERROR, "Select at least one document to preview.", 422)
     facts = preview_document(db, draft, body.document_ids)
     return s.StudioPreviewOut(spec=draft, facts=facts)

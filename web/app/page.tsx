@@ -1,24 +1,13 @@
 import Link from 'next/link';
-import {
-  Button,
-  Card,
-  CardBody,
-  CardKicker,
-  CardMeta,
-  CardTitle,
-  Pill,
-  Tag,
-  Td,
-  Th,
-} from '@/components/ui';
-import { getWorkspaces } from '@/lib/mock';
+import { redirect } from 'next/navigation';
+import { Button, Card, CardBody, CardKicker, CardMeta, CardTitle, Tag } from '@/components/ui';
+import { getMe, listWorkspaces } from '@/lib/api';
 
 export default async function HomePage() {
-  const workspaces = await getWorkspaces();
-  const sessionCount = workspaces.reduce((total, workspace) => total + workspace.sessions.length, 0);
-  const recent = workspaces.flatMap((workspace) =>
-    workspace.sessions.map((session) => ({ workspace, session })),
-  );
+  const user = await getMe();
+  if (!user) redirect('/login');
+  const workspaces = await listWorkspaces();
+  const sessionCount = workspaces.reduce((total, workspace) => total + workspace.session_count, 0);
 
   return (
     <div className="min-h-full">
@@ -26,10 +15,10 @@ export default async function HomePage() {
         <div className="flex flex-wrap items-end gap-3 sm:gap-4">
           <div className="mr-auto">
             <p className="eyebrow text-accent">Home</p>
-            <h1 className="display mt-1 text-[21px] font-extrabold leading-tight text-ink">Mara Ostwald</h1>
+            <h1 className="display mt-1 text-[21px] font-extrabold leading-tight text-ink">{user.name}</h1>
           </div>
           <Button href="/marketplace" variant="secondary">Marketplace</Button>
-          <Button href="/workspace/vendor" variant="primary">New workspace</Button>
+          <Button href="/workspace/new" variant="primary">New workspace</Button>
         </div>
       </header>
 
@@ -48,8 +37,6 @@ export default async function HomePage() {
           <div className="mt-2.5 grid grid-cols-2 border-t border-rule">
             <Stat value={workspaces.length} label="Workspaces" />
             <Stat value={sessionCount} label="Sessions" className="pl-3" />
-            <Stat value="142" label="Runs this month" />
-            <Stat value="1,038" label="Documents processed" className="pl-3" />
           </div>
         </div>
       </section>
@@ -67,11 +54,10 @@ export default async function HomePage() {
         </div>
         <div className="grid grid-cols-1 gap-[18px] md:grid-cols-2 xl:grid-cols-3">
           {workspaces.map((workspace) => {
-            const sessions = workspace.sessions.length;
-            const lastRun = workspace.id === 'onb' ? 'Last run 4 min ago' : workspace.id === 'invoice' ? 'Last run yesterday' : 'Never run';
             const packKicker = workspace.pack_name && workspace.pack_version
-              ? `${workspace.pack_name} ${workspace.pack_version}`
+              ? `${workspace.pack_name} v${workspace.pack_version}`
               : 'No pack installed';
+            const updated = new Date(workspace.updated_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
             return (
               <Card key={workspace.id} pad={false} className="flex min-h-[212px] flex-col border border-rule p-5 transition-colors hover:border-accent">
@@ -79,8 +65,8 @@ export default async function HomePage() {
                 <CardTitle className="mt-1 text-[21px]">{workspace.name}</CardTitle>
                 <CardBody className="mt-2">{workspace.goal}</CardBody>
                 <div className="mt-3 flex flex-wrap gap-1.5">
-                  <Tag>{sessions} session{sessions === 1 ? '' : 's'}</Tag>
-                  <Tag variant="outline">{lastRun}</Tag>
+                  <Tag>{workspace.session_count} session{workspace.session_count === 1 ? '' : 's'}</Tag>
+                  <Tag variant="outline">Updated {updated}</Tag>
                 </div>
                 <CardMeta>
                   <Button href={`/workspace/${workspace.id}/pack`} variant="ghost" size="sm">Edit pack</Button>
@@ -89,34 +75,10 @@ export default async function HomePage() {
               </Card>
             );
           })}
-          <Link href="/workspace/vendor" className="flex min-h-[212px] flex-col justify-end gap-1.5 border border-dashed border-rule p-[18px] transition-colors hover:border-accent">
+          <Link href="/workspace/new" className="flex min-h-[212px] flex-col justify-end gap-1.5 border border-dashed border-rule p-[18px] transition-colors hover:border-accent">
             <span className="display text-[21px] font-extrabold leading-tight text-ink">New workspace</span>
             <span className="max-w-[34ch] text-[13px] leading-relaxed text-ink-2">Start from a blank Pack, or install one from the Marketplace.</span>
           </Link>
-        </div>
-      </section>
-
-      <section className="px-6 pb-8">
-        <div className="border-t border-rule" />
-        <div className="my-3 flex items-baseline gap-3">
-          <p className="mr-auto eyebrow">Recent activity</p>
-          <Button href="/marketplace" variant="ghost" size="sm">Browse Marketplace</Button>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] border-collapse">
-            <thead><tr><Th>Session</Th><Th>Workspace</Th><Th>Status</Th><Th>Updated</Th><Th align="right">Open</Th></tr></thead>
-            <tbody>
-              {recent.map(({ workspace, session }) => (
-                <tr key={`${workspace.id}:${session.id}`}>
-                  <Td className="font-semibold text-ink">{session.title}</Td>
-                  <Td className="text-ink-2">{workspace.name}</Td>
-                  <Td><Pill tone="neutral">{session.status === 'complete' ? 'Complete' : 'Draft'}</Pill></Td>
-                  <Td className="text-ink-2">{session.meta}</Td>
-                  <Td align="right"><Button href={`/workspace/${workspace.id}/sessions/${session.id}`} variant="ghost" size="sm">Open</Button></Td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       </section>
     </div>

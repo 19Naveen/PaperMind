@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { IMPORT_SPEC_KEY, SAMPLE_WORKSPACE_ID, specToGraph, type PackSpec } from '@/lib/types';
+import { startTransition, useEffect, useMemo, useState } from 'react';
+import { IMPORT_SPEC_KEY, specToGraph, type PackSpec } from '@/lib/types';
 import { IconArrowRight, IconBriefcase, IconCheck, IconLayers } from '@/lib/icons';
+import { createWorkspaceAction } from '@/lib/session';
 
 type ObjectiveId = 'vendor' | 'audit' | 'contract' | 'custom';
 
@@ -40,12 +40,13 @@ const STEPS = ['Objective', 'Start from', 'Ready'];
  * No backend yet — "Create" lands on the sample workspace until POST exists.
  */
 export function NewWorkspaceWizard() {
-  const router = useRouter();
   const [step, setStep] = useState(0);
   const [objective, setObjective] = useState<ObjectiveId | null>(null);
   const [custom, setCustom] = useState('');
   const [startFrom, setStartFrom] = useState<string>('blank');
   const [importedSpec, setImportedSpec] = useState<PackSpec | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // ponytail: setState-in-effect for SSR-safe sessionStorage read (matches the
   // prior import-loader's justified pattern) — an imported spec routes here.
@@ -74,11 +75,18 @@ export function NewWorkspaceWizard() {
   }
 
   function create() {
-    // ponytail: stubbed — no backend. Real version resolves the chosen spec
-    // (blankWorkspace / specToGraph(importedSpec) / specToGraph(library pack))
-    // via a POST and redirects to the workspace it returns.
+    // ponytail: the chosen starting Pack (blank/imported/library) has no backend
+    // to receive it yet — only the workspace itself (name + goal) is real.
     if (importedSpec) void specToGraph(importedSpec);
-    router.push(`/workspace/${SAMPLE_WORKSPACE_ID}`);
+    const goal = objective === 'custom' ? 'No Pack installed yet.' : (OBJECTIVES.find((o) => o.id === objective)?.blurb ?? '');
+    setCreating(true);
+    setError(null);
+    startTransition(() => {
+      createWorkspaceAction(name, goal).catch((err: unknown) => {
+        setCreating(false);
+        setError(err instanceof Error ? err.message : 'Could not create the workspace.');
+      });
+    });
   }
 
   return (
@@ -205,15 +213,17 @@ export function NewWorkspaceWizard() {
             Workspace ready — starting from <strong className="font-data text-ink">{startFromLabel}</strong>. Sessions
             run this Pack against document sets, isolated from one another.
           </p>
+          {error && <p className="mt-4 text-[12.5px] text-missing">{error}</p>}
           <div className="mt-6 flex items-center justify-center gap-2">
-            <button onClick={() => setStep(1)} className="rounded-none border border-rule px-3.5 py-2 text-[13px] font-medium text-ink hover:bg-raised">
+            <button onClick={() => setStep(1)} disabled={creating} className="rounded-none border border-rule px-3.5 py-2 text-[13px] font-medium text-ink hover:bg-raised disabled:opacity-40">
               ← Back
             </button>
             <button
               onClick={create}
-              className="rounded-none bg-accent px-4 py-2 text-[13px] font-medium text-accent-ink transition-all hover:brightness-110"
+              disabled={creating}
+              className="rounded-none bg-accent px-4 py-2 text-[13px] font-medium text-accent-ink transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Open workspace
+              {creating ? 'Creating…' : 'Open workspace'}
             </button>
           </div>
         </section>

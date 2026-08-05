@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { Archivo, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import { AppShell } from '@/components/AppShell';
-import { getWorkspaces } from '@/lib/mock';
+import { getMe, listWorkspaces } from '@/lib/api';
 
 // The modernist face: one family for body (400) and display (800).
 const archivo = Archivo({ variable: '--font-archivo', subsets: ['latin'], weight: ['400', '500', '600', '800'] });
@@ -14,12 +14,17 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const workspaces = await getWorkspaces();
+  // getMe() returns null for a signed-out visitor; skip the (auth-gated)
+  // workspace list in that case rather than let it throw NOT_AUTHENTICATED.
+  const user = await getMe();
+  const workspaces = user ? await listWorkspaces() : [];
 
   return (
     <html lang="en" className={`${archivo.variable} ${jetbrains.variable} h-full`}>
       <body className="h-full antialiased">
-        <AppShell workspaces={workspaces}>{children}</AppShell>
+        <AppShell workspaces={workspaces} user={user}>
+          {children}
+        </AppShell>
       </body>
     </html>
   );

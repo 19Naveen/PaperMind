@@ -1,159 +1,347 @@
-# Backend Restructure Plan
+# Backend — Status Report & Plan
 
-Target: the architecture in `README.md`. Current backend is a Streamlit RAG demo;
-this is a rewrite beside it, not a refactor of it.
+**Last verified:** 2026-08-05, against `backend/` at `enhancements/backend`.
 
-## Guiding constraint
+The original rewrite plan (Phases 1–4) is **substantially built**. This document is now
+half status report, half forward plan: what exists and was verified, where it diverges
+from the frontend that has since been built, and what Phase 5 has to close.
 
-The README's own rule — *"which existing Knowledge Pack cannot be implemented
-without this capability?"* — is applied to the infrastructure too. Phase 1 ships
-**one datastore**. OpenSearch, MinIO, Celery, and the graph engine are deferred
-until a real Pack fails without them. Each has a named swap point below.
+---
 
-## Target layout
+## 1. Verification snapshot
+
+Everything below was executed, not assumed.
+
+| Check | Command | Result |
+|---|---|---|
+| Type safety | `uv run mypy app` | **Pass** — no issues in 15 source files, `strict = true` |
+| Lint | `uv run ruff check .` | **Pass** — all checks passed |
+| Tests | `uv run pytest -q` | **Pass** — 10/10 |
+| Coverage gate | `uv run pytest --cov=app --cov-fail-under=80` | **Broken** — `pytest-cov` not installed, see §5.1 |
+| Migration | `alembic/versions/1230e1bd1593` | Creates all 11 tables **and installs the triggers** (line 238) |
+
+Running the suite requires a Postgres on **5433** holding `papermind_test`, which
+`docker-compose.yml` does not provide (§5.2). It was created manually to verify.
+
+**Size:** 15 modules, ~2,100 LOC in `app/`, ~350 LOC in `tests/`.
+
+---
+
+## 2. Guiding constraint (unchanged)
+
+The README's rule — *"which existing Knowledge Pack cannot be implemented without this
+capability?"* — still governs the infrastructure. Phase 1 ships **one datastore**.
+OpenSearch, MinIO, Celery, and the graph engine remain deferred behind named swap points
+(§7). That constraint held: the retrieval layer is 60 lines of pgvector + `ts_rank` + RRF,
+and nothing has yet demonstrated it insufficient.
+
+---
+
+## 3. As-built architecture
+
+### 3.1 Modules
 
 ```
-backend/
-  main.py         FastAPI app, routers, /healthz
-  config.py       pydantic-settings (DB url, API keys, storage dir)
-  db.py           SQLAlchemy engine + session dependency
-  models.py       Pack, PackVersion, Run, Document, Chunk, Fact, Citation, Correction
-  packs.py        Pydantic KnowledgePack spec + CRUD routes (the contract)
-  ingest.py       upload -> store blob -> parse -> chunk -> embed
-  retrieval.py    hybrid search (tsvector BM25 + pgvector cosine, RRF merge)
-  runtime.py      the six stages, in order, no branching on LLM output
-  studio.py       authoring: LLM conversation -> draft Pack -> human approve
-  llm.py          provider abstraction (temperature=0 for runtime, >0 for studio)
-  storage.py      save_blob/read_blob — local fs now, S3 later
+backend/app/
+  main.py        FastAPI app, CORS, 4 routers, /healthz
+  config.py      pydantic-settings; DB url, provider selection, storage dir
+  db.py          engine + session dependency
+  models.py      11 SQLAlchemy models + TRIGGERS_SQL_SOURCE + install_triggers()
+  schemas.py     Pydantic API contract — mirrors web/lib/types.ts
+  packs.py       pack CRUD + the version approval gate
+  documents.py   upload, metadata, full content (for the evidence viewer)
+  runs.py        run creation, polling, corrections
+  runtime.py     the six stages — the core
+  studio.py      authoring sessions, SSE streaming, draft, preview
+  retrieval.py   hybrid search: pgvector cosine + ts_rank, RRF merge
+  ingest.py      parse → flatten pages → chunk with offsets → embed
+  llm.py         provider abstraction: Gemini | SentenceTransformers | Fake
+  storage.py     save_blob/read_blob — local fs
 ```
 
-Twelve files. No `services/`, `repositories/`, or `interfaces/` layer — one
-implementation each, add indirection when there are two.
+Twelve planned files became fifteen. Still no `services/` or `repositories/` layer —
+see the conflict note in §6.
 
-## Data model (the part that must be right)
+### 3.2 Data model — built as specified
 
-Everything else is replaceable; get this wrong and audit trails are worthless.
+The part the plan said "must be right" is right, and the invariants are in the database
+rather than in Python:
 
-- `packs` — identity only (id, org, name).
-- `pack_versions` — `(pack_id, version)` unique, `spec JSONB`, `created_at`.
-  **Append-only.** Enforce with a DB trigger rejecting UPDATE/DELETE, not app
-  code. This is README principle 6 and it cannot live in Python.
-- `runs` — `pack_version_id` (FK, not `pack_id`), `model_id`, `status`,
-  `started_at`. Every run pins the exact spec *and* model that produced it.
-- `documents` / `chunks` — chunk carries `doc_id, page, char_start, char_end,
-  text, embedding vector, tsv tsvector`. Offsets are what makes a citation
-  checkable rather than decorative.
-- `facts` — `run_id, field, value, state ∈ {verified, unsupported, missing}`.
-  A fact with `state=verified` and no citation row must be impossible: enforce
-  with a CHECK/trigger. "No citation, no result" is a constraint, not a habit.
-- `citations` — `fact_id, chunk_id, quote, char_start, char_end`.
-- `corrections` — `run_id, fact_id, user_value, created_at`. Written, never
-  applied. Feeds the v2 diff proposal in Phase 4.
+- **`pack_versions` is append-only.** A `BEFORE UPDATE OR DELETE` trigger raises. README
+  principle 6 is enforced where application code cannot bypass it.
+- **"No citation, no result" is a constraint.** Two `DEFERRABLE INITIALLY DEFERRED`
+  constraint triggers: one rejects a `verified` fact with no citation rows, the other
+  rejects deleting citations out from under a verified fact. Deferred so a fact and its
+  citations can land in one transaction.
+- **`runs` pins `pack_version_id` *and* `model_id`.** A result is reproducible back to the
+  exact spec and the exact model that produced it.
+- **Chunks carry `page`, `char_start`, `char_end`.** This is what makes a citation
+  checkable rather than decorative — and it is what stage 4 verifies against.
 
-## Phases
+Tables: `packs`, `pack_versions`, `runs`, `cases`, `documents`, `run_documents`, `chunks`,
+`facts`, `citations`, `corrections`, `studio_sessions`.
 
-### Phase 1 — Skeleton + Packs (the contract first)
+Indexes: HNSW (`vector_cosine_ops`) on `chunks.embedding`, GIN on `chunks.tsv`, plus
+`(run_id, case_id, field)` on facts.
 
-FastAPI app, Postgres via SQLAlchemy + Alembic, the schema above, and the
-`KnowledgePack` Pydantic model. Routes: create pack, save version, get version,
-list. No execution yet.
+### 3.3 Runtime — the deterministic core
 
-Doing the Pack schema first is deliberate — it's the interface every other
-component codes against, and it's the cheapest thing to get wrong now and
-expensive later.
+`execute_run()` calls six stages in fixed order with no branching on LLM output:
 
-**Check:** `test_packs.py` — save a version, attempt to mutate it, assert the DB
-rejects it.
+1. **classify** — structured output constrained to an `enum` of the Pack's declared doc
+   types. Anything not in the closed set becomes `null`, never a guess.
+2. **retrieve** — RRF over semantic + keyword channels, scoped to the case's documents.
+3. **extract** — one call per field, `temperature=0`, schema-bound `{found, value, quote}`.
+4. **verify** — **deterministic, no LLM.** `_locate_quote` normalizes whitespace and case,
+   then requires the quote to appear verbatim in a retrieved chunk. Found → `verified`
+   with real offsets. Not found → `unsupported`, even when the value looks plausible.
+   This is the cheapest implementation of "evidence first" and it catches the failure
+   mode that actually matters: fabricated citations.
+5. **cross-validate** — plain Python predicates over fact rows. No LLM.
+6. **report** — aggregate counts per state, per case.
 
-### Phase 2 — Ingest + Retrieval
+`test_runtime.py::test_fabricated_quote_is_unsupported_not_verified` pins stage 4's
+guarantee. That test is the single most valuable one in the suite.
 
-Upload endpoint → `storage.save_blob` → parse (PyPDF) → chunk (port
-`create_chunks`, keep the offset metadata, drop the rest) → embed → insert
-chunks.
+### 3.4 API surface (16 routes)
 
-Retrieval is `pgvector` cosine + Postgres `ts_rank` in one query, merged with
-Reciprocal Rank Fusion (~15 lines of SQL/Python). No OpenSearch, no reranker
-model in Phase 1.
+| Method | Path | Returns |
+|---|---|---|
+| GET | `/healthz` | status + active `model_id` |
+| POST | `/packs` | `PackOut` |
+| GET | `/packs` | `list[PackOut]` |
+| GET | `/packs/{id}` | `PackDetailOut` |
+| GET | `/packs/{id}/versions/{version}` | `PackVersionOut` |
+| POST | `/packs/{id}/versions` | `PackVersionOut` — **the approval gate** |
+| POST | `/documents` | `DocumentOut` |
+| GET | `/documents/{id}` | `DocumentOut` |
+| GET | `/documents/{id}/content` | `DocumentContent` — text + page offsets |
+| POST | `/runs` | `RunOut`, schedules a `BackgroundTask` |
+| GET | `/runs/{id}` | `RunOut` — poll target |
+| POST | `/runs/{id}/corrections` | `CorrectionOut` — appended, never applied |
+| POST | `/studio/sessions` | `StudioSessionOut` |
+| GET | `/studio/sessions/{id}` | `StudioSessionOut` |
+| POST | `/studio/sessions/{id}/messages` | SSE stream |
+| POST | `/studio/sessions/{id}/preview` | `StudioPreviewOut` — dry-run before approve |
 
-> `# ponytail: pgvector + ts_rank instead of OpenSearch. Swap retrieval.py's
-> search() when recall on a real Pack measurably suffers — the interface is one
-> function returning ranked chunk ids.`
+The approval gate is a route, exactly as planned: `studio` accrues a draft spec on a
+`studio_sessions` row; only `POST /packs/{id}/versions` writes an immutable version.
 
-**Check:** `test_retrieval.py` — index three known chunks, assert the
-keyword-only and semantic-only queries each surface the right one and RRF keeps
-both.
+---
 
-### Phase 3 — Runtime Engine
+## 4. The frontend gap — the main finding
 
-`runtime.py`, one function per stage, called in fixed order by one `execute(run)`:
+`web/` is now UI-complete (see `web/README.md`). It is organised around a model the
+backend does not have:
 
-1. **classify** — LLM, structured output, constrained to the Pack's declared doc
-   types. Output is a label from a closed set, never free text.
-2. **retrieve** — per field/rule, using Phase 2.
-3. **extract** — structured output bound to the field's declared type. One call
-   per field, not one summarizing call per document.
-4. **verify** — *deterministic first*: does the returned quote actually appear in
-   the cited chunk's text at the claimed offsets? String containment, no LLM.
-   Fails → `unsupported`. Only entailment-shaped rules escalate to an LLM check.
-   This is the cheapest possible implementation of "evidence first" and it
-   catches the failure mode that matters (fabricated citations).
-5. **cross_validate** — Pack-declared comparisons across facts in the same run.
-   Plain Python predicates over rows; no LLM.
-6. **report** — render the Pack's template over facts + citations.
+```
+frontend:   Workspace ──(1:1)── Pack ──(1:N)── Session
+backend:                        Pack ──(1:N)── Run
+```
 
-Runtime LLM calls use `temperature=0` and structured output only. No tool
-selection, no agent loop, no chain-of-thought over business rules — the Pack
-already decided.
+**There is no `workspace` anywhere in `backend/app/` — zero matches.** Nor any user,
+org, or tenancy column. The frontend's navigation spine has no persistence layer.
 
-Execution runs in a FastAPI `BackgroundTask`; the client polls `GET /runs/{id}`.
+### 4.1 Type-by-type mapping
 
-> `# ponytail: BackgroundTasks, single process. Move to a real queue when runs
-> outlive the process or need more than one worker.`
+| `web/lib/types.ts` | Backend equivalent | Gap |
+|---|---|---|
+| `Run`, `Fact`, `Citation`, `Case`, `RunDocument`, `DocumentContent` | `schemas.py` | **Exact match.** Deliberately mirrored. |
+| `PackSpec`, `PackField`, `PackRule`, `PackVersion`, `Pack` | `schemas.py` | **Match.** |
+| `ChatMessage`, `Chat` | `studio_sessions.messages` JSONB | Partial — no per-chat identity |
+| `Workspace` | — | **Missing entirely** |
+| `WorkspaceSession` | `Run` (closest) | Missing title, chat thread, file list, `updated`, `subject` |
+| `PackAsset` (`name`, `meta`) | — | **Missing.** A Pack can't carry template/policy files |
+| `PackNode` (`num`, `kicker`, `in`, `out`, `asset`, `prompt`) | — | **Missing.** The 7-node pipeline is pure frontend fixture |
+| `FlowNode` / `FlowEdge` | derived client-side by `specToGraph()` | Not persisted; node positions are recomputed, never stored |
+| `MarketplacePack` (`category`, `installs`, `author`) | — | **Missing.** No publishing/registry model |
 
-**Check:** `test_runtime.py` — one fixture doc, one 2-field Pack. Assert
-verified/missing/unsupported all reachable, and that a fabricated quote lands as
-`unsupported` rather than `verified`.
+### 4.2 What this means
 
-### Phase 4 — Studio + Surfaces
+The frontend is 100% driven by `web/lib/mock.ts`. Wiring it up is **not** a matter of
+swapping fetch calls in — roughly half its screens describe concepts with no server
+representation. Phase 5 has to add them before integration is meaningful.
 
-- `studio.py`: LangChain conversation that asks clarifying questions and emits a
-  **draft** Pack. Drafts are rows with `status=draft`; only an explicit approve
-  call writes a `pack_versions` row. The approval gate is a route, not a prompt
-  instruction.
-- Checklist surface = a query over `facts` for one run. Grid, rollup, diff are
-  the *same query* shaped differently — they are read models, not engines. Build
-  checklist only; the other three are ~20 lines each when someone asks.
-- Correction endpoint: append to `corrections`. The v2-diff proposer is deferred
-  until there are actual corrections to learn from.
+The honest framing: the backend built the *execution* half of the README correctly, and
+the frontend built the *organisation* half. They have not yet met.
 
-## Not building (and the trigger to revisit)
+---
+
+## 5. Defects and drift (verified)
+
+### 5.1 `make backend-test` cannot pass — dependency declaration
+
+`pytest-cov` is not installed, so the Makefile's
+`uv run pytest -v --cov=app --cov-fail-under=80 tests/` fails with
+`unrecognized arguments: --cov=app`. CLAUDE.md §8 lists that exact command as the
+definition of done.
+
+Root cause: `backend/pyproject.toml` has **no `[project]` table at all** — only tool
+config. Dependencies live in `requirements.txt`, but the Makefile runs `uv sync`, which
+reads `pyproject.toml`. Hence uv's warning on every invocation:
+`No requires-python value found in the workspace`.
+
+**Fix:** move `requirements.txt` into `[project].dependencies`, add a dev group carrying
+`pytest`, `pytest-cov`, `mypy`, `ruff`. This also settles the CLAUDE.md §7 "conda → uv"
+pending decision in uv's favour, with `uv.lock` as the reproducibility story.
+
+### 5.2 No test database service
+
+`tests/conftest.py` binds to `postgresql+psycopg://…@localhost:5433/papermind_test`.
+`docker-compose.yml` defines only the dev DB on 5432. A clean checkout cannot run the
+suite.
+
+**Fix:** add a `db-test` service on 5433 plus a `make db-test-up` target.
+
+### 5.3 Blocking I/O inside `async def` — CLAUDE.md §3.2
+
+Two routes are `async def` but do only synchronous work, stalling the event loop:
+
+- `documents.py:28 upload_document` — `store_document()` runs the sync DB session **and**
+  SentenceTransformers inference. This is the worst offender; embedding a large PDF
+  blocks every other request on the worker.
+- `runs.py:100 create_run` — sync `db.get` / `db.commit` throughout.
+
+**Fix:** drop `async` (FastAPI will run them in a threadpool), or wrap the blocking span
+in `run_in_threadpool`. Do not mix.
+
+### 5.4 No error contract — CLAUDE.md §3.4
+
+Routes raise bare `HTTPException(404, "pack not found")`, producing FastAPI's
+`{"detail": …}`. CLAUDE.md mandates one shape API-wide:
+`{"error": {"code": "…", "message": "…", "details": {}}}` with a stable machine-readable
+`code`, registered in a single handler.
+
+Worth fixing **before** the frontend integrates — clients that branch on `detail` strings
+will have to be rewritten otherwise.
+
+### 5.5 Unpaginated list endpoints — CLAUDE.md §3.5
+
+`GET /packs` returns every row. Needs `limit`/`cursor` before any real dataset.
+
+### 5.6 Uploaded blobs committed to git
+
+Three files under `backend/storage/d2bedfb1cea2e6da/` are tracked. There is no
+`backend/.gitignore`.
+
+**Fix:** add one covering `storage/`, `.env`, `__pycache__`, `.venv`; `git rm --cached`
+the blobs.
+
+### 5.7 Configuration hygiene
+
+- CORS origin is hardcoded to `http://localhost:3000` in `main.py`. Move to settings —
+  it will be wrong in every deployed environment.
+- `backend/.env.example` is untracked. It is the only documentation of required env
+  vars; it should be committed.
+- No secret is currently `SecretStr` — `gemini_api_key` is a plain `str | None`
+  (CLAUDE.md §3.3).
+
+### 5.8 Rule interpreter is keyword-matching
+
+`runtime._evaluate_rule` decides rule shape by scanning the description for `"must"`,
+`"required"`, `"at least"`, and a currency regex. It is honestly labelled *"a deliberately
+small rule interpreter"*, and keeping the LLM out of rule evaluation is correct. But rule
+semantics currently depend on English phrasing — `"liability cap ≥ $250,000"` fails where
+`"at least $250,000"` succeeds.
+
+**Fix path:** give `PackRule` a structured predicate (`{field, op, operand}`) authored by
+the studio, and keep the prose as a human-readable label. Don't grow the regex set.
+
+### 5.9 Studio conversation is partly scripted
+
+`_assistant_tokens` returns canned text; `_draft_spec` falls back to `_heuristic_draft`
+whenever the provider is fake *or* the LLM call raises. Fine for a demo, but the studio
+is the one place the README wants real LLM reasoning, so the fallback silently hides
+provider failures. It should surface them.
+
+---
+
+## 6. Conflict with CLAUDE.md to resolve
+
+CLAUDE.md §3.1 mandates a strict `router → service → repository → DB` layering, and §6
+forbids business logic in a router. The backend is deliberately flat: `packs.py` and
+`runs.py` construct queries directly, and this plan's original §"Target layout" argued
+for it — *"one implementation each, add indirection when there are two."*
+
+Per CLAUDE.md's own precedence rule (*follow the existing code and flag the conflict*),
+the flat structure stands. **Decide explicitly and record it:** either relax §3.1 for
+this service, or schedule the extraction. Leaving both documents contradicting each other
+is the worst option, because every future change has to re-litigate it.
+
+Recommendation: relax §3.1. `runtime.py` already *is* the service layer for the only
+non-trivial logic; a repository layer over 11 tables with one caller each would be pure
+ceremony.
+
+---
+
+## 7. Revised phases
+
+Phases 1–4 are built. What follows is scoped by what the frontend now demonstrably needs.
+
+### Phase 5 — Workspaces, Sessions, Identity *(next)*
+
+The integration blocker. In dependency order:
+
+1. **`users` + auth.** Minimum: `users(id, email, name, password_hash, role)`, a session
+   or JWT dependency, and a deny-by-default router dependency (CLAUDE.md §5). The
+   frontend's `/login`, `/signup`, `/profile`, `/settings` are all `localStorage` stubs
+   today — nothing behind them.
+2. **`workspaces`.** `(id, owner_id, name, goal, pack_id NULL, created_at)`. The 1:1
+   Workspace→Pack rule is a `UNIQUE` constraint on `pack_id`, not a convention.
+3. **`workspace_sessions`.** Wrap `runs`: `(id, workspace_id, title, run_id NULL, status,
+   messages JSONB, created_at, updated_at)`. A session is a *conversation about* a run —
+   which is why it can exist in `draft` before any run does, exactly as the UI shows.
+4. **`pack_assets`.** `(id, pack_version_id, name, blob_path, meta)`. Assets must be
+   versioned **with** the spec or the immutability guarantee leaks: a Pack whose template
+   file can change under it is not reproducible.
+5. **Routes:** `/workspaces` CRUD, `/workspaces/{id}/sessions` CRUD, session→run linking.
+
+**Check:** create a workspace, install a Pack, open two sessions, run both, assert both
+resolve to the same `pack_version_id` and that mutating the Pack mid-flight cannot change
+a completed session's result.
+
+### Phase 6 — Contract hardening
+
+The §5 list: error envelope, pagination, `async` correctness, `SecretStr`, CORS from
+settings, `.gitignore`, dependency declarations, test-DB service. Small individually;
+all of them are cheaper now than after a client depends on the current shapes.
+
+### Phase 7 — Marketplace
+
+Only once §4 is closed and a second workspace wants a Pack the first one authored:
+`pack_publications(pack_version_id, category, author_id, published_at)` plus install
+counts. Installing = copying a `pack_version` reference into a workspace. The frontend
+`/marketplace` screen already defines the required fields.
+
+### Phase 8 — Corrections → v2 proposal
+
+`corrections` rows accumulate today and nothing reads them. The v2-diff proposer stays
+deferred until there is a real correction corpus to learn from — that ordering was right
+and hasn't changed.
+
+---
+
+## 8. Not building (and the trigger to revisit)
 
 | Deferred | Build it when |
 |---|---|
-| OpenSearch | pgvector+ts_rank recall measurably fails a real Pack |
+| OpenSearch | pgvector + `ts_rank` recall measurably fails a real Pack |
 | MinIO / S3 | deploying to more than one box, or local disk fills |
-| Celery / Redis | a run outlives an HTTP process, or >1 worker needed |
+| Celery / Redis | a run outlives an HTTP process, or >1 worker is needed |
 | Reranker model | RRF ordering is the demonstrated cause of a wrong answer |
-| Graph engine, Python sandbox, vision/OCR | README already gates these to Phase 2+ |
-| Repository/service abstraction layer | there is a second implementation |
-| Multi-tenant auth | there is a second organization |
+| Graph engine, Python sandbox, vision/OCR | README gates these to Phase 2+ |
+| Repository/service layer | there is a second implementation (see §6) |
+| Multi-tenant orgs | there is a second organization — note Phase 5 adds *users*, not tenancy |
 
-## Old code
+The `BackgroundTask` executor keeps its original note: single process, no retry, a run
+dies with the worker. Acceptable while runs are minutes and users are few; the swap point
+is `runs.run_task`.
 
-`App.py` and `Utilities/setup.py` are deleted, along with the `streamlit`
-dependency. `Agents/` and `Utilities/Tools.py` remain only as salvage reference —
-they are dead code with no importer, delete them once Phase 3 passes its check,
-along with the checked-in `Embeddings/` model blobs (that belongs in a HF cache,
-not git). FastAPI's `/docs` is a sufficient dev client until the Next.js front
-end exists; see `frontend-plan.md`.
+---
 
-Salvage list, total: `create_chunks`'s offset metadata (`Utilities/Tools.py:51`)
-and the `LLM` singleton shape (`Utilities/Tools.py:10`). Nothing else.
+## 9. Old code
 
-Known bugs in the current code — reasons not to port it:
-- `Utilities/setup.py:21` — `os.remove(CHROMA_PATH)` targets the directory, not
-  the file; also wipes all uploads and vectors at import time.
-- `Agents/Wiki.py:27` — `wiki.run()` returns `str`, code subscripts it as a dict.
-- `Agents/URL.py:20`, `Agents/Wiki.py:36` — pass a `str` into `create_chunks`,
-  which calls `split_documents()` and requires `Document` objects.
-```
+Complete. `App.py`, `Agents/`, `Utilities/`, and the checked-in `Embeddings/` blobs are
+deleted from the working tree, along with the `streamlit` dependency. The salvage list
+(`create_chunks` offset metadata, the `LLM` singleton shape) was absorbed into
+`ingest.py` and `llm.py`. Nothing remains to port.

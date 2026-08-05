@@ -1,3 +1,32 @@
+[project]
+name = "papermind-backend"
+version = "0.1.0"
+description = "PaperMind backend API"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    "pydantic>=2.11",
+    "pydantic-settings>=2.8",
+    "sqlalchemy>=2.0.41",
+    "psycopg[binary]>=3.2",
+    "pgvector>=0.3.7",
+    "alembic>=1.16",
+    "python-multipart>=0.0.20",
+    "pypdf>=5.4",
+    # LLM / embeddings (optional at runtime; guarded imports)
+    "google-generativeai>=0.8",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-cov>=6.0",
+    "httpx>=0.28",
+    "mypy>=1.15",
+    "ruff>=0.11",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
@@ -9,7 +38,6 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "ANN", "ASYNC", "S", "RUF"]
-ignore = ["ANN101"]
 
 [tool.ruff.lint.per-file-ignores]
 "app/models.py" = ["E501"]
