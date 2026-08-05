@@ -160,3 +160,31 @@ def logout(response: Response) -> dict[str, str]:
 @router.get("/me", response_model=s.UserOut)
 def me(user: CurrentUser) -> s.UserOut:
     return _user_out(user)
+
+
+@router.patch("/me", response_model=s.UserOut)
+def update_me(body: s.MeUpdate, user: CurrentUser, db: DB) -> s.UserOut:
+    """Self-serve profile edits. PATCH semantics: only fields actually sent change."""
+    for field, value in body.model_dump(exclude_unset=True).items():
+        if value is None:
+            continue
+        if field == "email":
+            email = value.strip().lower()
+            taken = db.scalar(select(User).where(User.email == email, User.id != user.id))
+            if taken:
+                raise ApiError(
+                    Code.EMAIL_TAKEN, "an account with this email already exists", status=409
+                )
+            user.email = email
+        else:
+            setattr(user, field, value)
+    db.commit()
+    return _user_out(user)
+
+
+@router.patch("/me/password", status_code=204)
+def update_password(body: s.PasswordUpdate, user: CurrentUser, db: DB) -> None:
+    if not verify_password(body.current_password, user.password_hash):
+        raise ApiError(Code.WRONG_PASSWORD, "current password is incorrect", status=400)
+    user.password_hash = hash_password(body.new_password)
+    db.commit()

@@ -97,10 +97,10 @@ def load_run(db: Session, run_id: uuid.UUID) -> Run:
     return run
 
 
-# Plain `def`: every call below is synchronous DB I/O (CLAUDE.md §3.2).
-@router.post("", response_model=s.RunOut, status_code=201)
-def create_run(body: s.RunCreate, background: BackgroundTasks, db: DB) -> s.RunOut:
-    pv = db.get(PackVersion, body.pack_version_id)
+def create_run_rows(db: Session, pack_version_id: uuid.UUID, cases: list[s.RunCaseIn]) -> Run:
+    """Create a pending Run with its cases and document links. Shared by POST /runs and
+    the session-run route; the caller owns the background task that executes it."""
+    pv = db.get(PackVersion, pack_version_id)
     if pv is None:
         raise ApiError(Code.PACK_VERSION_NOT_FOUND, "Pack version not found.", 404)
 
@@ -113,7 +113,7 @@ def create_run(body: s.RunCreate, background: BackgroundTasks, db: DB) -> s.RunO
     db.add(run)
     db.commit()
 
-    for cin in body.cases:
+    for cin in cases:
         case = Case(run_id=run.id, subject=cin.subject)
         db.add(case)
         db.flush()
@@ -129,6 +129,13 @@ def create_run(body: s.RunCreate, background: BackgroundTasks, db: DB) -> s.RunO
             db.add(RunDocument(run_id=run.id, case_id=case.id, document_id=doc.id, doc_type=None))
 
     db.commit()
+    return run
+
+
+# Plain `def`: every call below is synchronous DB I/O (CLAUDE.md §3.2).
+@router.post("", response_model=s.RunOut, status_code=201)
+def create_run(body: s.RunCreate, background: BackgroundTasks, db: DB) -> s.RunOut:
+    run = create_run_rows(db, body.pack_version_id, body.cases)
     background.add_task(run_task, run.id)
     return serialize_run(run)
 

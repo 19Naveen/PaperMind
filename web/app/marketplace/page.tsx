@@ -1,19 +1,12 @@
-import {
-  ActionButton,
-  Button,
-  Card,
-  CardBody,
-  CardKicker,
-  CardMeta,
-  CardTitle,
-  Tag,
-} from '@/components/ui';
-import { getMarketplacePacks } from '@/lib/mock';
-
-const categories = ['All', 'Compliance', 'Finance', 'Legal', 'Operations', 'Research'];
+import { getMe, listPacks, listWorkspaces } from '@/lib/api';
+import { redirect } from 'next/navigation';
+import { Button, Card, CardBody, CardKicker, CardMeta, CardTitle, Tag } from '@/components/ui';
+import { MarketGrid } from './MarketGrid';
 
 export default async function MarketplacePage() {
-  const packs = await getMarketplacePacks();
+  const user = await getMe();
+  if (!user) redirect('/login');
+  const [packs, workspaces] = await Promise.all([listPacks(100), listWorkspaces(200)]);
 
   return (
     <div className="min-h-full">
@@ -21,34 +14,40 @@ export default async function MarketplacePage() {
         <div className="flex flex-wrap items-end gap-3 sm:gap-4">
           <div className="mr-auto">
             <p className="eyebrow text-accent">Marketplace</p>
-            <h1 className="display mt-1 text-[21px] font-extrabold leading-tight text-ink">Published packs</h1>
+            <h1 className="display mt-1 text-[21px] font-extrabold leading-tight text-ink">
+              Published packs
+            </h1>
           </div>
-          <label className="sr-only" htmlFor="pack-search">Search packs</label>
-          <input id="pack-search" type="search" placeholder="Search packs" className="w-full border border-rule bg-surface px-2 py-2 text-[13px] text-ink outline-none placeholder:text-ink-3 focus:border-accent sm:w-[260px]" />
-          <ActionButton variant="secondary">Publish yours</ActionButton>
+          <Button href="/workspace/new" variant="secondary">
+            Publish yours
+          </Button>
         </div>
       </header>
 
-      <div className="flex flex-wrap items-center gap-2 border-b border-rule px-6 py-[18px]">
-        {categories.map((category) => <Tag key={category} variant={category === 'All' ? 'accent' : 'neutral'}>{category}</Tag>)}
-      </div>
+      {packs.length === 0 ? (
+        <div className="mx-auto mt-16 max-w-md px-6 text-center">
+          <p className="eyebrow text-accent">Nothing published yet</p>
+          <h2 className="display mt-2 text-[23px] font-extrabold">No packs to install</h2>
+          <p className="mt-3 text-[13px] leading-relaxed text-ink-2">
+            Author a Pack from any workspace, approve it, and it becomes installable here.
+          </p>
+        </div>
+      ) : (
+        <MarketGrid packs={packs} workspaces={workspaces} />
+      )}
 
-      <section className="grid grid-cols-1 gap-[18px] p-6 md:grid-cols-2 xl:grid-cols-3">
-        {packs.map((pack) => (
-          <Card key={pack.id} pad={false} className="flex min-h-[230px] flex-col border border-rule p-5 transition-colors hover:border-accent">
-            <CardKicker>{pack.category}</CardKicker>
-            <CardTitle className="mt-1 text-[21px]">{pack.name}</CardTitle>
-            <CardBody className="mt-2">{pack.description}</CardBody>
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              <Tag>{pack.nodes} nodes</Tag>
-              <Tag>{pack.assets} assets</Tag>
-            </div>
-            <CardMeta>
-              <span>{pack.installs} installs · by {pack.author}</span>
-              <Button href="/workspace/vendor" variant="primary" size="sm" className="ml-auto">Install</Button>
-            </CardMeta>
-          </Card>
-        ))}
+      <section className="px-6 pb-8">
+        <Card className="mt-8 flex flex-wrap items-center gap-3">
+          <CardKicker>Pack hygiene</CardKicker>
+          <CardTitle className="text-[15px]">Every Pack here is a frozen version.</CardTitle>
+          <CardBody className="text-[12px] text-ink-2">
+            Installing claims the Pack for one workspace — a workspace can run exactly one
+            Pack, and a Pack can serve exactly one workspace.
+          </CardBody>
+          <CardMeta>
+            <Tag variant="outline">{packs.length} pack{packs.length === 1 ? '' : 's'}</Tag>
+          </CardMeta>
+        </Card>
       </section>
     </div>
   );

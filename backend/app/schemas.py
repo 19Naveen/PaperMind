@@ -277,3 +277,31 @@ class SessionUpdate(BaseModel):
     title: str | None = None
     subject: str | None = None
     status: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Session chat + runs
+# ---------------------------------------------------------------------------
+class SessionMessage(BaseModel):
+    text: str = Field(min_length=1)
+
+
+class SessionRunCreate(BaseModel):
+    document_ids: list[uuid.UUID] = []
+
+
+class WorkspacePackInstall(BaseModel):
+    pack_id: uuid.UUID
+
+
+# ---------------------------------------------------------------------------
+# Identity updates
+# ---------------------------------------------------------------------------
+class MeUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1)
+    email: str | None = Field(default=None, min_length=3)
+
+
+class PasswordUpdate(BaseModel):
+    current_password: str = Field(min_length=1)
+    new_password: str = Field(min_length=8)

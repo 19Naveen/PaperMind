@@ -17,13 +17,24 @@ import { revalidatePath } from 'next/cache';
 import {
   ApiError,
   SESSION_COOKIE,
+  approvePackVersion,
+  changePassword,
+  createPack,
+  createStudioSession,
   createWorkspace,
   createWorkspaceSession,
   fieldErrors,
+  installWorkspacePack,
   login,
   logout,
+  runSession,
   signup,
+  updateMe,
+  updateWorkspaceSession,
+  uploadDocument,
+  apiFetch,
 } from './api';
+import type { DocumentOut } from './api';
 
 export interface AuthFailure {
   code: string;
@@ -88,6 +99,113 @@ export async function createSessionAction(workspaceId: string, formData: FormDat
   const title = String(formData.get('title') ?? '').trim() || 'Untitled session';
   await createWorkspaceSession(workspaceId, title);
   revalidatePath(`/workspace/${workspaceId}`);
+}
+
+/** Uploads a document through the ingest pipeline and returns its id for the run. */
+export async function uploadDocumentAction(formData: FormData): Promise<DocumentOut> {
+  return uploadDocument(formData);
+}
+
+/** Kicks off the runtime engine for a session; the page polls the run route while it works. */
+export async function startRunAction(
+  workspaceId: string,
+  sessionId: string,
+  documentIds: string[],
+): Promise<void> {
+  await runSession(workspaceId, sessionId, documentIds);
+  revalidatePath(`/workspace/${workspaceId}/sessions/${sessionId}`);
+}
+
+/** Appends a correction. Corrections are written, never applied (§8 of the plan). */
+export async function correctFactAction(
+  workspaceId: string,
+  runId: string,
+  factId: string,
+  userValue: string,
+  note?: string,
+): Promise<void> {
+  await apiFetch(`/runs/${runId}/corrections`, {
+    method: 'POST',
+    body: JSON.stringify({ fact_id: factId, user_value: userValue, note: note ?? null }),
+  });
+  revalidatePath(`/workspace/${workspaceId}`);
+}
+
+/** Claims a Pack for a workspace from the Marketplace. */
+export async function installPackAction(workspaceId: string, packId: string): Promise<void> {
+  await installWorkspacePack(workspaceId, packId);
+  revalidatePath('/marketplace');
+  revalidatePath(`/workspace/${workspaceId}`);
+}
+
+/** Edits a session's title/subject in place. */
+export async function updateSessionAction(
+  workspaceId: string,
+  sessionId: string,
+  patch: { title?: string; subject?: string },
+): Promise<void> {
+  await updateWorkspaceSession(workspaceId, sessionId, patch);
+  revalidatePath(`/workspace/${workspaceId}/sessions/${sessionId}`);
+}
+
+// ------------------------------------------------------------------- profile
+
+export interface ProfileFailure {
+  code: string;
+  message: string;
+  /** Per-field messages for VALIDATION_ERROR / WRONG_PASSWORD. */
+  fields: Record<string, string>;
+}
+
+export async function updateMeAction(input: { name?: string; email?: string }): Promise<ProfileFailure | null> {
+  try {
+    await updateMe(input);
+  } catch (error) {
+    if (error instanceof ApiError) {
+      return { code: error.code, message: error.message, fields: fieldErrors(error) };
+    }
+    throw error;
+  }
+  revalidatePath('/settings');
+  return null;
+}
+
+export async function changePasswordAction(input: {
+  currentPassword: string;
+  newPassword: string;
+}): Promise<ProfileFailure | null> {
+  try {
+    await changePassword(input.currentPassword, input.newPassword);
+  } catch (error) {
+    if (error instanceof ApiError) {
+      return { code: error.code, message: error.message, fields: fieldErrors(error) };
+    }
+    throw error;
+  }
+  return null;
+}
+
+// ---------------------------------------------------------- pack authoring flow
+
+/** Author → approve → install, one action: creates the Pack, freezes the studio draft as
+ * its first version, claims it for the workspace, and opens the workspace. */
+export async function approveAndInstallAction(
+  workspaceId: string,
+  studioSessionId: string,
+  packName: string,
+): Promise<never> {
+  const pack = await createPack(packName);
+  await approvePackVersion(pack.id, studioSessionId);
+  await installWorkspacePack(workspaceId, pack.id);
+  revalidatePath(`/workspace/${workspaceId}`);
+  revalidatePath(`/workspace/${workspaceId}/pack`);
+  redirect(`/workspace/${workspaceId}`);
+}
+
+/** Creates the studio conversation a workspace's pack page authors against. */
+export async function createStudioSessionAction(title: string): Promise<string> {
+  const session = await createStudioSession(title);
+  return session.id;
 }
 
 export async function signOutAction(): Promise<void> {

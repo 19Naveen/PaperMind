@@ -5,6 +5,161 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { Card, CardHeader, EmptyState, PageHeader } from '@/components/ui';
 import { IconSettings } from '@/lib/icons';
+import { changePasswordAction, updateMeAction, type ProfileFailure } from '@/lib/session';
+
+function FieldError({ message }: { message: string | undefined }) {
+  if (!message) return null;
+  return <p className="mt-1 text-[11.5px] text-missing">{message}</p>;
+}
+
+function AccountCard() {
+  const { user } = useAuth();
+  const [name, setName] = useState(user?.name ?? '');
+  const [email, setEmail] = useState(user?.email ?? '');
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<ProfileFailure | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function save() {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    const result = await updateMeAction({ name: name.trim(), email: email.trim() });
+    setBusy(false);
+    if (result) {
+      setError(result);
+      return;
+    }
+    setMessage('Profile updated.');
+  }
+
+  return (
+    <Card pad={false}>
+      <CardHeader title="Account" />
+      <div className="px-4 py-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="account-name" className="block text-[12px] font-medium text-ink-2">
+              Name
+            </label>
+            <input
+              id="account-name"
+              value={name}
+              onChange={(event) => {
+                setName(event.target.value);
+                setMessage(null);
+              }}
+              className="mt-1 w-full border border-rule bg-surface px-2.5 py-1.5 text-[13px] text-ink outline-none focus:border-accent"
+            />
+            <FieldError message={error?.fields.name} />
+          </div>
+          <div>
+            <label htmlFor="account-email" className="block text-[12px] font-medium text-ink-2">
+              Email
+            </label>
+            <input
+              id="account-email"
+              type="email"
+              value={email}
+              onChange={(event) => {
+                setEmail(event.target.value);
+                setMessage(null);
+              }}
+              className="mt-1 w-full border border-rule bg-surface px-2.5 py-1.5 text-[13px] text-ink outline-none focus:border-accent"
+            />
+            <FieldError message={error?.fields.email} />
+          </div>
+        </div>
+        {error && !error.fields.name && !error.fields.email && (
+          <p className="mt-2 text-[11.5px] text-missing">{error.message}</p>
+        )}
+        <div className="mt-4 flex items-center gap-3">
+          <button
+            onClick={() => void save()}
+            disabled={busy}
+            className="border border-accent bg-accent px-3.5 py-1.5 text-[13px] font-medium text-accent-ink transition-all hover:brightness-110 disabled:opacity-50"
+          >
+            {busy ? 'Saving…' : 'Save changes'}
+          </button>
+          {message && <p className="text-[12px] text-verified">{message}</p>}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function PasswordCard() {
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<ProfileFailure | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function save() {
+    if (busy || !current || next.length < 8) return;
+    setBusy(true);
+    setError(null);
+    const result = await changePasswordAction({ currentPassword: current, newPassword: next });
+    setBusy(false);
+    if (result) {
+      setError(result);
+      return;
+    }
+    setCurrent('');
+    setNext('');
+    setMessage('Password changed.');
+  }
+
+  return (
+    <Card pad={false}>
+      <CardHeader title="Password" />
+      <div className="grid grid-cols-1 gap-4 px-4 py-4 sm:grid-cols-2">
+        <div>
+          <label htmlFor="password-current" className="block text-[12px] font-medium text-ink-2">
+            Current password
+          </label>
+          <input
+            id="password-current"
+            type="password"
+            value={current}
+            onChange={(event) => {
+              setCurrent(event.target.value);
+              setMessage(null);
+            }}
+            className="mt-1 w-full border border-rule bg-surface px-2.5 py-1.5 text-[13px] text-ink outline-none focus:border-accent"
+          />
+          <FieldError message={error?.code === 'WRONG_PASSWORD' ? error.message : undefined} />
+        </div>
+        <div>
+          <label htmlFor="password-new" className="block text-[12px] font-medium text-ink-2">
+            New password (8+ characters)
+          </label>
+          <input
+            id="password-new"
+            type="password"
+            value={next}
+            onChange={(event) => {
+              setNext(event.target.value);
+              setMessage(null);
+            }}
+            className="mt-1 w-full border border-rule bg-surface px-2.5 py-1.5 text-[13px] text-ink outline-none focus:border-accent"
+          />
+          <FieldError message={error?.fields.new_password} />
+        </div>
+      </div>
+      <div className="flex items-center gap-3 border-t border-rule px-4 py-3">
+        <button
+          onClick={() => void save()}
+          disabled={busy || !current || next.length < 8}
+          className="border border-accent bg-accent px-3.5 py-1.5 text-[13px] font-medium text-accent-ink transition-all hover:brightness-110 disabled:opacity-50"
+        >
+          {busy ? 'Changing…' : 'Change password'}
+        </button>
+        {message && <p className="text-[12px] text-verified">{message}</p>}
+      </div>
+    </Card>
+  );
+}
 
 /**
  * Notification preferences are browser-local until the API grows an endpoint for
@@ -109,6 +264,8 @@ export default function SettingsPage() {
       <PageHeader eyebrow="Account" title="Settings" meta={<span className="font-data text-[11.5px] text-ink-3">{user.email}</span>} />
 
       <div className="mt-6 space-y-3">
+        <AccountCard />
+        <PasswordCard />
         <Card pad={false}>
           <CardHeader title="Notifications" />
           <div className="divide-y divide-rule">
@@ -126,7 +283,9 @@ export default function SettingsPage() {
             />
           </div>
         </Card>
-        <p className="font-data text-[10px] text-ink-3">mock preferences — stored locally, no backend yet</p>
+        <p className="font-data text-[10px] text-ink-3">
+          notification preferences are browser-local until the API grows an endpoint for them
+        </p>
       </div>
     </div>
   );

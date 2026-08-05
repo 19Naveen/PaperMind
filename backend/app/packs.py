@@ -122,9 +122,7 @@ def approve_version(pack_id: uuid.UUID, body: s.PackApprove, db: DB) -> s.PackVe
             )
         mark_approved(db, body.draft_session_id)
     if draft is None:
-        raise ApiError(
-            Code.APPROVAL_SOURCE_INVALID, "A draft session or a spec is required.", 422
-        )
+        raise ApiError(Code.APPROVAL_SOURCE_INVALID, "A draft session or a spec is required.", 422)
 
     spec = draft
 

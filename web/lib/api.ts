@@ -88,12 +88,30 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     ...init,
     cache: 'no-store',
     headers: {
-      'content-type': 'application/json',
+      // FormData must keep fetch's own multipart boundary, so it gets no content-type.
+      ...(init?.body instanceof FormData ? {} : { 'content-type': 'application/json' }),
       ...(session ? { cookie: `${SESSION_COOKIE}=${session.value}` } : {}),
       ...init?.headers,
     },
   });
   return parse<T>(res);
+}
+
+/**
+ * Like `apiFetch` but returns the raw `Response` — for SSE proxies, where the body is
+ * a stream the caller re-serves. Server-only, same cookie forwarding rules.
+ */
+export async function apiStream(path: string, init?: RequestInit): Promise<Response> {
+  const session = (await cookies()).get(SESSION_COOKIE);
+  return fetch(`${BASE_URL}${path}`, {
+    ...init,
+    cache: 'no-store',
+    headers: {
+      'content-type': 'application/json',
+      ...(session ? { cookie: `${SESSION_COOKIE}=${session.value}` } : {}),
+      ...init?.headers,
+    },
+  });
 }
 
 // ----------------------------------------------------------------- API models
@@ -122,7 +140,7 @@ export interface WorkspaceSessionOut {
   status: string;
   run_id: string | null;
   subject: string | null;
-  messages: unknown[];
+  messages: ChatMessage[];
   created_at: string;
   updated_at: string;
 }
@@ -136,6 +154,108 @@ export interface WorkspaceAssetOut {
 export interface WorkspaceDetailOut extends WorkspaceOut {
   sessions: WorkspaceSessionOut[];
   assets: WorkspaceAssetOut[];
+}
+
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+// ------------------------------------------------------------------------- runs
+
+export interface Citation {
+  chunk_id: string;
+  quote: string;
+  document_id: string;
+  document_name: string;
+  page: number;
+  char_start: number;
+  char_end: number;
+}
+
+export type FactState = 'verified' | 'unsupported' | 'missing';
+
+export interface Fact {
+  id: string;
+  case_id: string;
+  field: string;
+  value: string | null;
+  state: FactState;
+  citations: Citation[];
+}
+
+export interface RunCaseOut {
+  id: string;
+  subject: string;
+}
+
+export interface RunDocumentOut {
+  id: string;
+  case_id: string;
+  name: string;
+  doc_type: string | null;
+}
+
+export type RunStatus = 'pending' | 'running' | 'complete' | 'failed';
+
+export interface RunOut {
+  id: string;
+  pack_id: string;
+  pack_name: string;
+  pack_version: number;
+  status: RunStatus;
+  stage: string | null;
+  started_at: string;
+  cases: RunCaseOut[];
+  documents: RunDocumentOut[];
+  facts: Fact[];
+}
+
+// ------------------------------------------------------------------------ packs
+
+export interface PackSpec {
+  name: string;
+  document_types: string[];
+  fields: { name: string; description: string; type: string }[];
+  rules: { id: string; description: string }[];
+}
+
+export interface PackOut {
+  id: string;
+  name: string;
+  latest_version: number;
+  updated_at: string;
+}
+
+export interface PackVersionOut {
+  id: string;
+  version: number;
+  created_at: string;
+  spec: PackSpec;
+}
+
+export interface PackDetailOut {
+  pack: PackOut;
+  versions: PackVersionOut[];
+}
+
+// ---------------------------------------------------------------------- studio
+
+export interface StudioSessionOut {
+  id: string;
+  pack_id: string | null;
+  title: string;
+  status: string;
+  draft: PackSpec | null;
+  created_at: string;
+}
+
+// ------------------------------------------------------------------- documents
+
+export interface DocumentOut {
+  id: string;
+  name: string;
+  content_type: string | null;
 }
 
 // ---------------------------------------------------------------------- auth
@@ -225,4 +345,75 @@ export function updateWorkspaceSession(
 
 export function deleteWorkspaceSession(workspaceId: string, sessionId: string): Promise<unknown> {
   return apiFetch(`/workspaces/${workspaceId}/sessions/${sessionId}`, { method: 'DELETE' });
+}
+
+// ------------------------------------------------------------ session runs + chat
+
+export function getRun(runId: string): Promise<RunOut> {
+  return apiFetch<RunOut>(`/runs/${runId}`);
+}
+
+export function runSession(workspaceId: string, sessionId: string, documentIds: string[]): Promise<RunOut> {
+  return apiFetch<RunOut>(`/workspaces/${workspaceId}/sessions/${sessionId}/run`, {
+    method: 'POST',
+    body: JSON.stringify({ document_ids: documentIds }),
+  });
+}
+
+export function installWorkspacePack(workspaceId: string, packId: string): Promise<WorkspaceOut> {
+  return apiFetch<WorkspaceOut>(`/workspaces/${workspaceId}/pack`, {
+    method: 'POST',
+    body: JSON.stringify({ pack_id: packId }),
+  });
+}
+
+// ------------------------------------------------------------------ profile
+
+export function updateMe(patch: { name?: string; email?: string }): Promise<User> {
+  return apiFetch<User>('/auth/me', { method: 'PATCH', body: JSON.stringify(patch) });
+}
+
+export function changePassword(currentPassword: string, newPassword: string): Promise<unknown> {
+  return apiFetch('/auth/me/password', {
+    method: 'PATCH',
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+  });
+}
+
+// ----------------------------------------------------------------- documents
+
+/** Multipart upload. The body must be a `FormData`, so no JSON content-type header. */
+export function uploadDocument(formData: FormData): Promise<DocumentOut> {
+  return apiFetch<DocumentOut>('/documents', { method: 'POST', body: formData });
+}
+
+// --------------------------------------------------------------------- packs
+
+export function listPacks(limit = 100, offset = 0): Promise<PackOut[]> {
+  return apiFetch<PackOut[]>(`/packs?limit=${limit}&offset=${offset}`);
+}
+
+export function getPack(packId: string): Promise<PackDetailOut> {
+  return apiFetch<PackDetailOut>(`/packs/${packId}`);
+}
+
+export function createPack(name: string): Promise<PackOut> {
+  return apiFetch<PackOut>('/packs', { method: 'POST', body: JSON.stringify({ name }) });
+}
+
+export function approvePackVersion(packId: string, draftSessionId: string): Promise<PackVersionOut> {
+  return apiFetch<PackVersionOut>(`/packs/${packId}/versions`, {
+    method: 'POST',
+    body: JSON.stringify({ draft_session_id: draftSessionId }),
+  });
+}
+
+// -------------------------------------------------------------------- studio
+
+export function createStudioSession(title: string): Promise<StudioSessionOut> {
+  return apiFetch<StudioSessionOut>('/studio/sessions', { method: 'POST', body: JSON.stringify({ title }) });
+}
+
+export function getStudioSession(sessionId: string): Promise<StudioSessionOut> {
+  return apiFetch<StudioSessionOut>(`/studio/sessions/${sessionId}`);
 }

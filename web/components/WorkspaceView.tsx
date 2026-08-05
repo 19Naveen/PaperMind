@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import type { WorkspaceDetailOut, WorkspaceSessionOut } from '@/lib/api';
 import { createSessionAction } from '@/lib/session';
 import { PageHeader, Button, CardKicker, CardTitle, Tag, Divider, EmptyState } from '@/components/ui';
@@ -86,16 +87,18 @@ export function WorkspaceView({ initial }: { initial: WorkspaceDetailOut }) {
               <CardKicker>Sessions</CardKicker>
               <div className="mt-4 divide-y divide-rule border-y border-rule">
                 {initial.sessions.map((session) => (
-                  <div key={session.id} className="flex items-center gap-3 py-3">
-                    <span className={`h-2 w-2 rounded-full ${sessionState[session.status]}`} />
+                  <Link
+                    key={session.id}
+                    href={`/workspace/${initial.id}/sessions/${session.id}`}
+                    className="flex items-center gap-3 py-3 transition-colors hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  >
+                    <span className={`h-2 w-2 rounded-full ${sessionState[session.status] ?? 'bg-raised text-ink-2'}`} />
                     <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{session.title}</span>
                     <span className="font-data text-[10px] text-ink-3">{session.status}</span>
-                  </div>
+                  </Link>
                 ))}
                 {initial.sessions.length === 0 && <p className="py-5 text-[12px] text-ink-2">No sessions yet.</p>}
               </div>
-              {/* ponytail: session detail (chat, evidence) has no backend yet, so this
-                  only creates the draft row — it doesn't open a session view. */}
               <form action={createSessionAction.bind(null, initial.id)} className="mt-4 flex gap-2">
                 <label className="sr-only" htmlFor="session-title">Session title</label>
                 <input
