@@ -1,0 +1,20 @@
+# API framework
+fastapi>=0.115
+uvicorn[standard]>=0.34
+# Conf/gigo
+pydantic>=2.11
+pydantic-settings>=2.8
+# Database
+sqlalchemy>=2.0.41
+psycopg[binary]>=3.2
+pgvector>=0.3.7
+alembic>=1.16
+# Uploads
+python-multipart>=0.0.20
+# Document parsing
+pypdf>=5.4
+# Testing
+pytest>=8.3
+httpx>=0.28
+# LLM / embeddings (optional at runtime; guarded imports)
+google-generativeai>=0.8

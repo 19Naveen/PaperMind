@@ -1,0 +1,265 @@
+@import "tailwindcss";
+
+/*
+  PaperMind — "Modernist", ported from the Workspace pack-builder prototype.
+
+  Warm paper ground, ink-tinted hairline dividers, a single display face
+  (Archivo) and a flat red-orange action color. Sharp corners throughout —
+  zero radius is the signature. Color is reserved for state and action,
+  never decoration. Token *names* stay stable so the rest of the app only
+  sees new values.
+*/
+@theme {
+  --font-display: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  --font-data: var(--font-jetbrains), ui-monospace, "SF Mono", monospace;
+
+  /* Paper surfaces */
+  --color-ground: #f3f2f2;
+  --color-surface: #eae9e9;
+  --color-raised: #f8f4f4;
+  --color-inset: #e7e4e4;
+  --color-ink: #201e1d;
+  --color-ink-2: #615d5d;
+  --color-ink-3: #9b9797;
+  --color-rule: #a5a09f;
+  --color-rule-2: #cdc9c8;
+
+  /* Warm neutral ramp — shared lightness scale, matches the prototype. */
+  --color-neutral-100: #f8f4f4;
+  --color-neutral-200: #eae7e7;
+  --color-neutral-300: #d7d3d3;
+  --color-neutral-400: #bab6b6;
+  --color-neutral-500: #9b9797;
+  --color-neutral-600: #7d7979;
+  --color-neutral-700: #605d5d;
+  --color-neutral-800: #444141;
+  --color-neutral-900: #2d2b2b;
+
+  /* Brand / actions */
+  --color-accent: #ec3013;
+  --color-accent-ink: #f3f2f2;
+  --color-accent-soft: #fff2ef;
+  --color-accent-2: #e15b47;
+  --color-focus: #dd2b0f;
+
+  --color-accent-100: #fff2ef;
+  --color-accent-200: #ffe0d9;
+  --color-accent-300: #ffc4b8;
+  --color-accent-400: #ff9783;
+  --color-accent-500: #ff563c;
+  --color-accent-600: #dd2b0f;
+  --color-accent-700: #ae1800;
+  --color-accent-800: #7c1405;
+  --color-accent-900: #4d170e;
+
+  /* Fact state. Never decorative — if it's colored, it's a state. */
+  --color-verified: #0b6b4f;
+  --color-verified-soft: #e3f4ee;
+  --color-unsupported: #9a5b00;
+  --color-unsupported-soft: #fbf1dd;
+  --color-missing: #b41f36;
+  --color-missing-soft: #fde9ec;
+
+  /* Operational, non-fact signals. */
+  --color-running: #3557c7;
+  --color-running-soft: #e8edfb;
+
+  /* Transilluminated span in the evidence viewer. */
+  --color-highlight: #ffe8a3;
+  --color-highlight-edge: #d9a53c;
+
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+
+  --shadow-xs: 0 1px 2px rgb(32 30 29 / 0.14);
+  --shadow-sm: 0 1px 2px rgb(32 30 29 / 0.14), 0 2px 6px rgb(32 30 29 / 0.1);
+  --shadow-md: 0 3px 10px rgb(32 30 29 / 0.16);
+  --shadow-lg: 0 12px 32px rgb(32 30 29 / 0.22);
+}
+
+@media (prefers-color-scheme: dark) {
+  @theme {
+    --color-ground: #191715;
+    --color-surface: #211e1d;
+    --color-raised: #2a2624;
+    --color-inset: #171514;
+    --color-ink: #efe9e6;
+    --color-ink-2: #a8a09c;
+    --color-ink-3: #6e6763;
+    --color-rule: #3d3836;
+    --color-rule-2: #2b2725;
+
+    --color-neutral-100: #2a2624;
+    --color-neutral-200: #33302e;
+    --color-neutral-300: #46413f;
+    --color-neutral-400: #5d5754;
+    --color-neutral-500: #6e6763;
+    --color-neutral-600: #8a8380;
+    --color-neutral-700: #a8a09c;
+    --color-neutral-800: #c6c0bc;
+    --color-neutral-900: #e4dfdc;
+
+    --color-accent: #ff563c;
+    --color-accent-ink: #201e1d;
+    --color-accent-soft: #3a170f;
+    --color-accent-2: #ef6853;
+    --color-focus: #ff7860;
+
+    --color-accent-100: #3a170f;
+    --color-accent-200: #59190c;
+    --color-accent-300: #8a2009;
+    --color-accent-400: #d02c0a;
+    --color-accent-500: #ff563c;
+    --color-accent-600: #ff7860;
+    --color-accent-700: #ff9a84;
+    --color-accent-800: #ffb9a8;
+    --color-accent-900: #ffd9cc;
+
+    --color-verified: #46c896;
+    --color-verified-soft: #10352a;
+    --color-unsupported: #dfae56;
+    --color-unsupported-soft: #3a2d10;
+    --color-missing: #ff7676;
+    --color-missing-soft: #401a1e;
+
+    --color-running: #8ea2ff;
+    --color-running-soft: #1c2440;
+
+    --color-highlight: #3a2f12;
+    --color-highlight-edge: #a37d24;
+
+    --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-sm: 0 4px 14px -4px rgb(0 0 0 / 0.5);
+    --shadow-md: 0 12px 28px -8px rgb(0 0 0 / 0.55);
+    --shadow-lg: 0 26px 64px -18px rgb(0 0 0 / 0.65);
+  }
+}
+
+body {
+  background: var(--color-ground);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Display face runs tight bold like the prototype headlines. */
+.display {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.015em;
+}
+
+/* Section eyebrow. Uppercase, tracked, quiet — this is what every block is. */
+.eyebrow {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-ink-2);
+}
+
+/* The signature: a bates-style locator stamp. */
+.stamp {
+  font-family: var(--font-data);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  border: 1px solid var(--color-rule);
+  border-radius: 0;
+  padding: 1px 6px;
+  color: var(--color-ink-2);
+  white-space: nowrap;
+  background: var(--color-surface);
+}
+
+/* The cited span, lit up inside its source. */
+.evidence-span {
+  background: var(--color-highlight);
+  box-shadow: inset 2px 0 0 var(--color-highlight-edge);
+  color: var(--color-ink);
+  padding: 1px 0;
+}
+
+@keyframes sweep {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+.sweep {
+  animation: sweep 420ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/* Keyboard hint chip (⌘K and friends). */
+.kbd {
+  font-family: var(--font-data);
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  color: var(--color-ink-2);
+  border: 1px solid var(--color-rule);
+  border-bottom-width: 2px;
+  border-radius: 0;
+  padding: 0 5px;
+  line-height: 1.6;
+  background: var(--color-raised);
+  white-space: nowrap;
+}
+
+/* A quiet index strip — the readout bar that tells you what the console knows. */
+.readout {
+  font-family: var(--font-data);
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  color: var(--color-ink-3);
+  white-space: nowrap;
+}
+
+:focus-visible {
+  outline: none;
+}
+:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* Thin, low-noise scrollbars true to the workspace ethos. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-rule) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-rule);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--color-ink-3);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-accent) 30%, transparent);
+  color: var(--color-ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sweep {
+    animation: none;
+  }
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
