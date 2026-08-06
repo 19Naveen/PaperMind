@@ -120,7 +120,7 @@ lib/
 
 ## Design system — "Modernist"
 
-Ported from the canonical prototype `Reference/PaperMind.dc.html` (see `../docs/frontend-revamp-spec.md`). Flat and architectural: a warm paper ground, ink hairline rules, one display face, and a single red accent reserved for action and state.
+Ported from the canonical prototype `Reference/PaperMind.dc.html` at the repository root — that file is the single visual/positional source of truth and governs new frontend work. Flat and architectural: a warm paper ground, ink hairline rules, one display face, and a single red accent reserved for action and state.
 
 **Non-negotiables:**
 
@@ -154,6 +154,21 @@ Take colors and fonts from the tokens (`text-ink-2`, `bg-surface`, `border-rule`
 ### Accessibility floor
 
 Not a feature — a quality bar. Full keyboard operability, visible `:focus-visible` rings (never removed without replacement), `aria-current` on active nav, `aria-expanded`/`aria-controls` on disclosures, `role="status"`/`role="alert"` where async success/errors land, destructive-confirmation dialogs that name the action and close on Escape, and `prefers-reduced-motion` respected globally.
+
+### Layout & responsive rules
+
+Canonical geometry from the prototype, to keep the fixed console shell intact:
+
+- **Desktop shell is a fixed `100dvh` viewport with hidden root overflow.** The 266px rail and content column stay fixed; each page pane owns its vertical scrolling. Every flex/grid ancestor of an internal scroller must carry `min-height: 0`.
+- **Gutters:** 24px main content gutter (may reduce to 16px at narrow widths); 18px card gaps; 18×24px page headers.
+- **Pane widths:** Pack Studio = 360px conversation, ≥520px canvas, 312px inspector; Session = 452px state/conversation rail. Horizontal overflow is acceptable before collapsing an authoring tool to unusable width.
+- **Grids:** stat strips are flush modular grids (shared top rule, per-cell bottom rule), never boxed cards.
+- **Responsive:** design and test at 320, 375, 768, 1024, 1280, and 1440px; account for the 266px rail (1024px viewport leaves ~758px for content); use `dvh` not `vh`; wrap action rows, inputs go full-width on mobile, wide tables scroll horizontally with labels; touch targets ≥40px where possible, never below 32px.
+- **Motion:** transitions 100–150ms, animating state change not decoration.
+
+### Interface copy
+
+Active voice, sentence case, user vocabulary — "Save changes", not "Submit". An action keeps its name through the whole flow. Errors state what happened and the next step; they don't apologize and they aren't vague.
 
 ---
 

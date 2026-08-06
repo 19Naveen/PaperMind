@@ -12,8 +12,8 @@ marked `unsupported`, never believed. Retrieval is hybrid (pgvector cosine + Pos
 `ts_rank`, merged with Reciprocal Rank Fusion). Blobs live on local disk today via a small
 `storage` swap point; LLM and embedding providers are behind an interface.
 
-The frontend spec (documents, Pack workflow, Workspace/Session organisation, marketplace)
-lives in `docs/specs.md` and `docs/backend-plan.md`; the authoritative architecture
+The product model (documents, Pack workflow, Workspace/Session organisation, marketplace)
+is described in the root `../README.md`; the authoritative architecture
 conventions are in `/AGENTS.md`.
 
 ---
@@ -246,8 +246,37 @@ Every error response — domain, framework, or validation — has one shape:
 ## Configuration
 
 - Settings are defined **only** in `app/core/config.py`, read from `.env` + environment,
-  and accessed through a cached `get_settings()`.
+  and exposed via the cached `get_settings()`.
 - Secrets (`SESSION_SECRET`, `GEMINI_API_KEY`) are `SecretStr`.
 - **New env var** → add it to `app/core/config.py` *and* `.env.example` in the same change.
 - List endpoints are paginated (`limit`/`offset`, bounded `limit`); out-of-range limits are
   rejected as `422`, not silently clamped.
+
+---
+
+## Forward plan & deferred infrastructure
+
+Scope is governed by a single rule (see the root `../README.md`): a capability is added
+only once a real Pack demonstrably requires it. Everything below is a labelled destination,
+not a build item, until that trigger fires.
+
+| Deferred | Build it when |
+|---|---|
+| OpenSearch | pgvector + `ts_rank` recall measurably fails a real Pack |
+| MinIO / S3 | deploying to more than one box, or local disk fills |
+| Celery / Redis | a run outlives an HTTP process, or >1 worker is needed |
+| Reranker model | RRF ordering is the demonstrated cause of a wrong answer |
+| Graph engine, Python sandbox, vision/OCR | README gates these to Phase 2+ |
+| Repository/service layer | there is a second implementation (see layout note above) |
+| Multi-tenant orgs | there is a second organisation — users exist, tenancy does not |
+
+**Marketplace** — publishing (`pack_publications`) plus a Registry UI is scoped for once a
+second workspace wants a Pack the first authored. Install = copy a `pack_version` reference
+into a workspace; the web `/marketplace` already defines the fields it needs.
+
+**Corrections → v2 diff** — `corrections` rows accumulate and nothing reads them yet. The
+v2-diff proposer stays deferred until there is a real correction corpus to learn from.
+
+**Executor** — runs execute in a single FastAPI `BackgroundTask`: no retry, a run dies with
+the worker. Acceptable while runs are minutes and users are few; the named swap point is
+`runs.run_task`.

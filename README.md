@@ -333,9 +333,9 @@ MinIO / S3-compatible object storage
 ```
 backend/          FastAPI service — app/, alembic/, tests/ (uv + pyproject.toml)
 web/              Next.js frontend — see web/README.md
-docs/             specs.md, backend-plan.md, frontend-plan.md
 Makefile          every dev command, run from the repository root
 docker-compose.yml  local Postgres
+Reference/        canonical frontend prototype (PaperMind.dc.html)
 ```
 
 ---
@@ -368,9 +368,9 @@ make frontend-lint frontend-typecheck frontend-build
 
 | Area | State |
 |---|---|
-| Frontend UI | Complete across Home, Marketplace, Workspace, Pack builder, Session, and account screens — but **entirely mock-driven** (`web/lib/mock.ts`); no API calls yet |
-| Backend | Schema, migrations, and service scaffolding in place; runtime pipeline in progress |
-| Auth | `localStorage` stub on the frontend. Not a security boundary |
+| Frontend UI | Complete across Home, Marketplace, Workspace, Pack builder, Session, and account screens — wired to the FastAPI backend through `web/lib/api.ts` |
+| Backend | Workspaces, Packs, Sessions, documents, runs, and the six-stage runtime built; see `backend/README.md` |
+| Auth | Real signup/login against the backend; httpOnly session cookie proxied through the Next.js server layer |
 | Product surfaces | The **Checklist** surface is the Phase 1 target. Grid, Rollup, Diff, and Explorer are described below as the design destination, not as shipped features |
 
 The frontend is organised around the **Workspace → Pack → Session** model: a workspace holds exactly one Pack, and each session is an isolated execution of it. See [`web/README.md`](./web/README.md) for the frontend architecture and design-system rules.
