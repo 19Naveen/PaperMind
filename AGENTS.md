@@ -16,16 +16,17 @@
 ```
 backend/
   app/
-    main.py              # app factory + router registration ONLY
-    core/                # config, security, logging, exception handlers
-    api/v1/routers/      # HTTP layer only
-    api/deps.py          # shared FastAPI dependencies
-    services/            # business logic (framework-agnostic)
-    repositories/        # data access
+    main.py              # app factory + router registration only
+    core/                # config, database engine, security, exception handlers
+    api/
+      deps.py            # request-scoped database and authentication dependencies
+      v1/routers/        # HTTP routers
+    services/            # ingestion, LLM, retrieval, runtime, and blob storage
+    repositories/        # data-access modules as query logic is extracted from routers
     models/              # SQLAlchemy ORM models
     schemas/             # Pydantic request/response DTOs
-  migrations/            # Alembic
-  tests/                 # mirrors app/ structure
+  alembic/               # Alembic environment and migrations
+  tests/                 # backend tests
 web/
   app/                   # Next.js App Router routes — thin, fetch + render a *View
   components/ui.tsx      # design-system primitives (Button, PageHeader, Card, Tag,
@@ -199,6 +200,7 @@ Otherwise: pending state + inline spinner on the control. Always invalidate the 
 - **Logging:** structured JSON, request-ID correlated. Never log secrets, tokens, or PII. `print()`/`console.log` never reaches main.
 - **Security defaults:** deny-by-default auth dependency on routers; explicit CORS allowlist (no `*`); rate limit auth and write endpoints; validate upload type and size server-side.
 - **Git:** conventional commits; one logical change per PR; PR description states what changed, why, and how it was verified.
+- **Docs stay truthful:** any change to the documented stack, layout, routes, endpoint contract, config/env vars, commands, or behavior **must** update the matching README (`backend/README.md`, `web/README.md`) in the same change. A README that contradicts the code is a defect. Keep both in sync when a `docs/` plan has landed in code.
 
 ---
 
@@ -249,3 +251,5 @@ npm run build
 Required config: mypy `strict = true`; `tsconfig` `"strict": true`, `"noUncheckedIndexedAccess": true`; Ruff `select = ["E","F","I","UP","B","SIM","ANN","ASYNC","S","RUF"]`.
 
 **Before declaring done, state:** what changed, which commands you ran, and any rule in this file you had to bend and why.
+
+**Before declaring done, also check docs:** if your change touched anything documented in `backend/README.md` or `web/README.md` (stack, layout, routes, env vars, commands, behavior, known gaps), update those READMEs in the same change. Do not finish until the docs match the code.

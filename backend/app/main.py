@@ -3,14 +3,14 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.auth import router as auth_router
-from app.config import get_settings
-from app.documents import router as documents_router
-from app.errors import install_error_handlers
-from app.packs import router as packs_router
-from app.runs import router as runs_router
-from app.studio import router as studio_router
-from app.workspaces import router as workspaces_router
+from app.api.v1.routers.auth import router as auth_router
+from app.api.v1.routers.documents import router as documents_router
+from app.api.v1.routers.packs import router as packs_router
+from app.api.v1.routers.runs import router as runs_router
+from app.api.v1.routers.studio import router as studio_router
+from app.api.v1.routers.workspaces import router as workspaces_router
+from app.core.config import get_settings
+from app.core.errors import install_error_handlers
 
 settings = get_settings()
 

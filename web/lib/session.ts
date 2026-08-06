@@ -23,6 +23,7 @@ import {
   createStudioSession,
   createWorkspace,
   createWorkspaceSession,
+  deleteWorkspaceSession,
   fieldErrors,
   installWorkspacePack,
   login,
@@ -95,10 +96,10 @@ export async function createWorkspaceAction(name: string, goal: string): Promise
 }
 
 /** Adds a draft session to a workspace and refreshes its overview in place. Bind `workspaceId` for use as a `<form action>`. */
-export async function createSessionAction(workspaceId: string, formData: FormData): Promise<void> {
+export async function createSessionAction(workspaceId: string, formData: FormData): Promise<never> {
   const title = String(formData.get('title') ?? '').trim() || 'Untitled session';
-  await createWorkspaceSession(workspaceId, title);
-  revalidatePath(`/workspace/${workspaceId}`);
+  const session = await createWorkspaceSession(workspaceId, title);
+  redirect(`/workspace/${workspaceId}/sessions/${session.id}`);
 }
 
 /** Uploads a document through the ingest pipeline and returns its id for the run. */
@@ -146,6 +147,13 @@ export async function updateSessionAction(
 ): Promise<void> {
   await updateWorkspaceSession(workspaceId, sessionId, patch);
   revalidatePath(`/workspace/${workspaceId}/sessions/${sessionId}`);
+}
+
+/** Deletes one session after the client has completed an explicit confirmation. */
+export async function deleteSessionAction(workspaceId: string, sessionId: string): Promise<never> {
+  await deleteWorkspaceSession(workspaceId, sessionId);
+  revalidatePath(`/workspace/${workspaceId}`);
+  redirect(`/workspace/${workspaceId}`);
 }
 
 // ------------------------------------------------------------------- profile

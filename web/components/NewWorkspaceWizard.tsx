@@ -92,7 +92,7 @@ export function NewWorkspaceWizard() {
   return (
     <div className="mx-auto max-w-2xl px-6 py-10">
       {/* Stepper — encodes real sequence: decide, compose, open. */}
-      <ol className="mb-12 flex items-center gap-2">
+      <ol className="mb-12 flex max-w-full items-center gap-2 overflow-x-auto pb-2">
         {STEPS.map((label, i) => (
           <li key={label} className="flex items-center gap-2">
             <span
@@ -122,11 +122,12 @@ export function NewWorkspaceWizard() {
               <li key={o.id}>
                 <button
                   onClick={() => pick(o.id)}
+                  aria-pressed={objective === o.id}
                   className={`group flex w-full items-center gap-4 rounded-none border px-4 py-3.5 text-left transition-all ${
                     objective === o.id ? 'border-accent bg-accent-soft shadow-sm' : 'border-rule bg-surface hover:border-ink-3 hover:shadow-sm'
                   }`}
                 >
-                  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-none border ${objective === o.id ? 'border-accent/40 bg-white text-accent' : 'border-rule bg-raised text-ink-3'}`}>
+                  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-none border ${objective === o.id ? 'border-accent/40 bg-surface text-accent' : 'border-rule bg-raised text-ink-3'}`}>
                     <IconBriefcase width={16} height={16} />
                   </span>
                   <span className="min-w-0 flex-1">
@@ -171,6 +172,7 @@ export function NewWorkspaceWizard() {
                   <li key={id}>
                     <button
                       onClick={() => setStartFrom(id)}
+                      aria-pressed={on}
                       className={`flex w-full items-center justify-between gap-3 rounded-none border px-4 py-3 text-left transition-all ${
                         on ? 'border-accent bg-accent-soft shadow-sm' : 'border-rule bg-surface hover:border-ink-3'
                       }`}

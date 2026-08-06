@@ -10,11 +10,11 @@ from fastapi import APIRouter, File, UploadFile
 from sqlalchemy.orm import Session
 
 import app.schemas as s
-from app.db import DB
-from app.errors import ApiError, Code
-from app.ingest import store_document
+from app.core.db import DB
+from app.core.errors import ApiError, Code
 from app.models import Document
-from app.storage import save_blob
+from app.services.ingest import store_document
+from app.services.storage import save_blob
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 log = logging.getLogger(__name__)

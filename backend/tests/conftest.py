@@ -19,15 +19,15 @@ import pytest
 from sqlalchemy import text
 
 from app import models  # noqa: F401
-from app.db import SessionLocal, engine
-from app.llm import FakeEmbedder, FakeLLM, set_providers
+from app.core.db import SessionLocal, engine
+from app.services.llm import FakeEmbedder, FakeLLM, set_providers
 from app.models import install_triggers
 
 
 @pytest.fixture(scope="session", autouse=True)
 def _prepare_database():
     _create_database_if_missing()
-    from app.db import Base
+    from app.core.db import Base
 
     with engine.begin() as conn:
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))

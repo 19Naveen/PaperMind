@@ -5,8 +5,8 @@ from __future__ import annotations
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.ingest import chunk_text, flatten_pages
-from app.llm import get_providers
+from app.services.ingest import chunk_text, flatten_pages
+from app.services.llm import get_providers
 from app.models import Chunk, Document
 
 

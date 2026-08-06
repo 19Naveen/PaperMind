@@ -13,7 +13,7 @@ import io
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.llm import get_providers
+from app.services.llm import get_providers
 from app.models import Chunk, Document
 
 PAGE_BREAK = "\n\n"

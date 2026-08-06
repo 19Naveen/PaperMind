@@ -9,8 +9,8 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.auth import router as auth_router
-from app.workspaces import router as workspaces_router
+from app.api.v1.routers.auth import router as auth_router
+from app.api.v1.routers.workspaces import router as workspaces_router
 
 
 @pytest.fixture
@@ -85,7 +85,7 @@ def test_forged_cookie_is_rejected(app_client: TestClient) -> None:
 
 
 def test_password_hashing_roundtrip_and_malformed_input() -> None:
-    from app.auth import hash_password, verify_password
+    from app.core.security import hash_password, verify_password
 
     stored = hash_password("hunter2hunter2")
     assert stored.startswith("scrypt$") and "hunter2hunter2" not in stored
@@ -98,9 +98,9 @@ def test_password_hashing_roundtrip_and_malformed_input() -> None:
 
 
 def test_cookie_with_a_non_uuid_body_is_rejected(app_client: TestClient) -> None:
-    from app.auth import _sign
+    from app.core.security import sign_session
 
-    app_client.cookies.set("papermind_session", f"not-a-uuid.{_sign('not-a-uuid')}")
+    app_client.cookies.set("papermind_session", f"not-a-uuid.{sign_session('not-a-uuid')}")
     assert app_client.get("/auth/me").status_code == 401
 
 
@@ -199,7 +199,7 @@ def test_session_lifecycle_and_appears_in_detail(app_client: TestClient) -> None
 
 
 def test_workspace_out_carries_pack_name_and_latest_version(app_client: TestClient) -> None:
-    from app.db import SessionLocal
+    from app.core.db import SessionLocal
     from app.models import Pack, PackAsset, PackVersion, Workspace
 
     user = signup(app_client)

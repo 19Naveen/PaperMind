@@ -10,9 +10,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 import app.schemas as s
-from app.db import DB
-from app.errors import ApiError, Code
-from app.llm import get_providers
+from app.core.db import DB
+from app.core.errors import ApiError, Code
 from app.models import (
     Case,
     Chunk,
@@ -24,7 +23,8 @@ from app.models import (
     Run,
     RunDocument,
 )
-from app.runtime import execute_run
+from app.services.llm import get_providers
+from app.services.runtime import execute_run
 
 router = APIRouter(prefix="/runs", tags=["runs"])
 
@@ -176,7 +176,7 @@ def run_task(run_id: uuid.UUID) -> None:
     try:
         execute_run(run_id)
     except Exception:
-        from app.db import SessionLocal
+        from app.core.db import SessionLocal
 
         db = SessionLocal()
         try:

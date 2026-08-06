@@ -16,9 +16,9 @@ from typing import cast
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from app.llm import JSON_SCHEMA, get_providers
+from app.services.llm import JSON_SCHEMA, get_providers
 from app.models import Case, Chunk, Citation, Fact, Run, RunDocument
-from app.retrieval import search
+from app.services.retrieval import search
 from app.schemas import PackSpec
 
 STAGES = ("classify", "retrieve", "extract", "verify", "cross-validate", "report")
@@ -49,7 +49,7 @@ def _classify_schema(document_types: list[str]) -> dict[str, object]:
 def execute_run(run_id: uuid.UUID) -> dict[str, object]:
     """Run the six stages in fixed order. One function call per stage; no alternate
     paths. Runs in a FastAPI BackgroundTask; the client polls GET /runs/{id}."""
-    from app.db import SessionLocal
+    from app.core.db import SessionLocal
 
     db = SessionLocal()
     try:

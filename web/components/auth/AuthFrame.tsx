@@ -8,12 +8,12 @@ import type { ReactNode } from 'react';
 export function AuthFrame({ eyebrow, pitch, children }: { eyebrow: string; pitch: string; children: ReactNode }) {
   return (
     <main className="flex min-h-screen items-center justify-center bg-ground px-4 py-10">
-      <div className="w-full max-w-[900px] overflow-hidden rounded-[10px] border border-rule bg-surface shadow-sm">
+      <div className="w-full max-w-[900px] overflow-hidden border border-rule bg-surface shadow-sm">
         <div className="grid md:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
           <aside className="hidden flex-col justify-between border-r border-rule bg-raised p-8 md:flex">
             <div>
               <div className="flex items-center gap-2.5">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[6px] border border-rule bg-surface font-data text-[13px] font-bold text-accent">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center border border-rule bg-surface font-data text-[13px] font-bold text-accent">
                   P
                 </span>
                 <div className="min-w-0">

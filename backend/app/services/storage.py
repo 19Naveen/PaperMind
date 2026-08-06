@@ -8,7 +8,7 @@ import uuid
 from pathlib import Path
 from typing import BinaryIO
 
-from app.config import get_settings
+from app.core.config import get_settings
 
 _root = Path(get_settings().storage_dir)
 

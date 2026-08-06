@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { ChatMessage, Fact, RunOut, RunStatus, WorkspaceSessionOut } from '@/lib/api';
-import { correctFactAction, startRunAction, updateSessionAction, uploadDocumentAction } from '@/lib/session';
+import { correctFactAction, deleteSessionAction, startRunAction, updateSessionAction, uploadDocumentAction } from '@/lib/session';
 import {
   ActionButton,
   Card,
@@ -134,6 +134,9 @@ export function SessionView({ workspaceId, workspaceName, session, run }: Sessio
   const [starting, setStarting] = useState(false);
   const [subject, setSubject] = useState(session.subject ?? '');
   const [subjectDirty, setSubjectDirty] = useState(false);
+  const [title, setTitle] = useState(session.title);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const replyRef = useRef('');
 
   const status: RunStatus =
@@ -222,19 +225,33 @@ export function SessionView({ workspaceId, workspaceName, session, run }: Sessio
     router.refresh();
   }
 
+  async function saveTitle() {
+    const next = title.trim();
+    if (!next) return;
+    await updateSessionAction(workspaceId, session.id, { title: next });
+    setIsRenaming(false);
+    router.refresh();
+  }
+
   const renderedMessages = [...messages, ...(streaming ? [{ role: 'assistant' as const, content: reply }] : [])];
 
   return (
     <main className="flex min-h-full flex-col bg-ground text-ink">
       <PageHeader
         eyebrow={`Session in ${workspaceName}`}
-        title={session.title}
+        title={isRenaming ? (
+          <span className="flex flex-wrap items-center gap-2">
+            <label className="sr-only" htmlFor="session-title-edit">Session title</label>
+            <input id="session-title-edit" value={title} onChange={(event) => setTitle(event.target.value)} className="w-[min(72vw,360px)] border border-rule bg-surface px-2 py-1 font-sans text-[14px] font-normal text-ink outline-none focus:border-accent" />
+            <ActionButton size="sm" variant="primary" onClick={() => void saveTitle()} disabled={!title.trim()}>Save</ActionButton>
+          </span>
+        ) : title}
         actions={
           <>
             <Tag variant="neutral">{liveRun ? `Pack ${liveRun.pack_name} v${liveRun.pack_version}` : 'Pack pending'}</Tag>
-            <Pill tone={STATUS_TONE[status]} dot={running}>
-              {status}
-            </Pill>
+            <ActionButton size="sm" variant="secondary" onClick={() => setIsRenaming((value) => !value)}>{isRenaming ? 'Cancel' : 'Rename'}</ActionButton>
+            <ActionButton size="sm" variant="danger" onClick={() => setIsDeleteOpen(true)}>Delete</ActionButton>
+            <ActionButton size="sm" variant="primary" onClick={() => void start()} disabled={starting || running || uploaded.length === 0}>{starting ? 'Starting…' : liveRun ? 'Run again' : 'Start run'}</ActionButton>
           </>
         }
       />
@@ -408,6 +425,19 @@ export function SessionView({ workspaceId, workspaceName, session, run }: Sessio
           )}
         </section>
       </div>
+      {isDeleteOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-ink/45 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) setIsDeleteOpen(false); }}>
+          <section role="alertdialog" aria-modal="true" aria-labelledby="delete-session-title" aria-describedby="delete-session-copy" className="w-full max-w-md border-2 border-rule bg-ground p-5 shadow-lg" onKeyDown={(event) => { if (event.key === 'Escape') setIsDeleteOpen(false); }}>
+            <p className="eyebrow text-missing">Destructive action</p>
+            <h2 id="delete-session-title" className="display mt-1 text-[21px]">Delete this session?</h2>
+            <p id="delete-session-copy" className="mt-3 text-[13px] leading-relaxed text-ink-2">This removes “{title}” and its workspace history. This cannot be undone.</p>
+            <div className="mt-5 flex justify-end gap-2">
+              <ActionButton variant="secondary" onClick={() => setIsDeleteOpen(false)}>Cancel</ActionButton>
+              <ActionButton variant="danger" onClick={() => void deleteSessionAction(workspaceId, session.id)}>Delete session</ActionButton>
+            </div>
+          </section>
+        </div>
+      )}
     </main>
   );
 }

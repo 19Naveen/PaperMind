@@ -1,5 +1,47 @@
-__pycache__
-.vscode
-instructor-embedding
-chatbot
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+*.egg
+dist/
+build/
+eggs/
+*.whl
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Linting/Type checking
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Environment
 .env
+.env.local
+
+# Node (web/)
+node_modules/
+.next/
+out/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+instructor-embedding/
+chatbot/
+Reference/

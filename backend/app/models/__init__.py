@@ -21,8 +21,8 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
-from app.config import get_settings
-from app.db import Base
+from app.core.config import get_settings
+from app.core.db import Base
 
 settings = get_settings()
 

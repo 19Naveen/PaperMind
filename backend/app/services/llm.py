@@ -17,7 +17,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from typing import cast
 
-from app.config import Settings, get_settings
+from app.core.config import Settings, get_settings
 
 # JSON Schema subset both a structured call and the extractor produce against.
 JSON_SCHEMA = dict[str, object]

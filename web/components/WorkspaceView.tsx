@@ -29,32 +29,47 @@ export function WorkspaceView({ initial }: { initial: WorkspaceDetailOut }) {
 
   return (
     <main className="min-h-full bg-ground text-ink">
-      <PageHeader eyebrow="Workspace" title={initial.name} />
+      <PageHeader
+        eyebrow="Workspace"
+        title={initial.name}
+        actions={
+          <>
+            <Button href={`/workspace/${initial.id}/pack`} variant="secondary">{hasPack ? 'View pack' : 'Build a pack'}</Button>
+            <form action={createSessionAction.bind(null, initial.id)}>
+              <input type="hidden" name="title" value="Untitled session" />
+              <button type="submit" className="inline-flex items-center border border-accent bg-accent px-[14px] py-2 font-display text-[13.5px] font-extrabold text-accent-ink transition-colors hover:bg-accent-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2">
+                New session
+              </button>
+            </form>
+          </>
+        }
+      />
 
       {!hasPack ? (
-        <div className="mx-auto flex min-h-[calc(100vh-89px)] max-w-2xl flex-col justify-center px-6 py-16">
+        <div className="mx-auto flex min-h-[calc(100dvh-145px)] max-w-2xl flex-col justify-center px-6 py-16">
           <EmptyState
             title="No Pack installed"
-            body="A Pack gives every session the same documents, instructions and outputs. Browse the Marketplace to install one for this workspace."
+            body="A Pack gives every session the same documents, instructions and outputs. Build one from a description or install a published Pack."
             action={
-              // ponytail: Pack authoring (chat + graph) has no backend yet — only
-              // installing a published Pack is a real flow, so that's the one link.
-              <Button href="/marketplace" variant="primary">Browse Marketplace</Button>
+              <div className="flex flex-wrap justify-center gap-2">
+                <Button href={`/workspace/${initial.id}/pack`} variant="primary">Build a pack</Button>
+                <Button href="/marketplace" variant="secondary">Browse Marketplace</Button>
+              </div>
             }
           />
           <div className="mt-12 border-t-2 border-rule pt-4 text-[12px] leading-relaxed text-ink-2">
-            Sessions stay empty until a Pack is installed. Once installed, every run remains comparable because it follows the same versioned workflow.
+            You can prepare sessions now; runs become available after a Pack is installed. Every completed run remains comparable because it follows the same versioned workflow.
           </div>
         </div>
       ) : (
-        <div className="mx-auto max-w-[1440px] px-5 py-7 sm:px-7">
-          <section className="grid gap-6 border-b-2 border-rule pb-7 lg:grid-cols-[minmax(0,1fr)_380px]">
+        <div>
+          <section className="grid gap-6 border-b-2 border-rule px-4 py-7 sm:px-6 xl:grid-cols-[minmax(0,1fr)_300px]">
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <CardKicker>Installed pack</CardKicker>
                 <Tag variant="outline">{initial.pack_version !== null ? `v${initial.pack_version}` : 'Draft'}</Tag>
               </div>
-              <CardTitle className="mt-2 text-[28px]">{initial.pack_name}</CardTitle>
+              <CardTitle className="mt-2 text-[28px] text-accent">{initial.pack_name}</CardTitle>
               <p className="mt-3 max-w-3xl text-[14px] leading-relaxed text-ink-2">{initial.goal}</p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Tag>Versioned workflow</Tag>
@@ -62,8 +77,8 @@ export function WorkspaceView({ initial }: { initial: WorkspaceDetailOut }) {
                 <Tag>Audit ready</Tag>
               </div>
             </div>
-            <div className="border-l-0 border-rule lg:border-l lg:pl-6">
-              <CardKicker>Pack assets</CardKicker>
+            <div className="border-l-0 border-rule xl:border-l xl:pl-6">
+              <CardKicker>Pack contents</CardKicker>
               <div className="mt-3 divide-y divide-rule border-y border-rule">
                 {initial.assets.map((asset) => (
                   <div key={asset.id} className="py-2.5">
@@ -75,14 +90,15 @@ export function WorkspaceView({ initial }: { initial: WorkspaceDetailOut }) {
             </div>
           </section>
 
-          <section className="grid grid-cols-2 border-l border-t-2 border-rule sm:grid-cols-4">
+          <section className="mx-4 mt-[18px] grid grid-cols-2 border-l border-t border-rule sm:mx-6 sm:grid-cols-5">
             <GridStat label="Version" value={initial.pack_version !== null ? `v${initial.pack_version}` : 'Draft'} />
+            <GridStat label="Completed" value={completed} />
             <GridStat label="Assets" value={initial.assets.length} />
             <GridStat label="Sessions" value={initial.session_count} />
             <GridStat label="Visibility" value="Private" />
           </section>
 
-          <section className="mt-8 grid gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <section className="px-4 py-7 sm:px-6">
             <div>
               <CardKicker>Sessions</CardKicker>
               <div className="mt-4 divide-y divide-rule border-y border-rule">
@@ -119,8 +135,8 @@ export function WorkspaceView({ initial }: { initial: WorkspaceDetailOut }) {
             </div>
           </section>
 
-          <Divider className="mt-10" />
-          <section className="mt-4 grid grid-cols-2 border-l border-t-2 border-rule md:grid-cols-3">
+          <Divider />
+          <section className="mx-4 my-6 grid grid-cols-2 border-l border-t-2 border-rule sm:mx-6 md:grid-cols-3">
             <GridStat label="Sessions run" value={initial.session_count} />
             <GridStat label="Completed" value={completed} />
             <GridStat label="Assets attached" value={initial.assets.length} />

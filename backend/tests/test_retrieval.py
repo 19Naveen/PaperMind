@@ -3,7 +3,7 @@ chunk, and RRF keeps both in the final ranking."""
 
 from __future__ import annotations
 
-from app.retrieval import search
+from app.services.retrieval import search
 from tests.util import ingest_text
 
 DOC_A = ["The corporate governance report mentions zephyr and quarterly projections."]
@@ -48,6 +48,6 @@ def test_search_without_documents_returns_nothing(db):
 
 
 def search_query(db, query, ids, k):
-    from app.retrieval import search
+    from app.services.retrieval import search
 
     return search(db, query, ids, k=k)

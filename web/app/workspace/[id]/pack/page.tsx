@@ -36,7 +36,7 @@ export default async function PackBuilderPage({
         <div className="mx-auto max-w-2xl px-6 py-10">
           <Card>
             <CardKicker>Installed pack</CardKicker>
-            <CardTitle className="mt-1 text-[24px]">{workspace.pack_name}</CardTitle>
+            <CardTitle className="mt-1 text-[24px] text-accent">{workspace.pack_name}</CardTitle>
             <CardBody className="mt-2">
               {workspace.goal ||
                 'This workspace runs a single frozen Pack — every session executes the same version, so results stay comparable.'}

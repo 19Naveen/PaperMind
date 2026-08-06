@@ -23,7 +23,7 @@ export function Field({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         autoComplete={autoComplete}
-        className="mt-1.5 w-full rounded-[6px] border border-rule bg-surface px-3.5 py-2.5 text-[13px] text-ink outline-none placeholder:text-ink-3 focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/25"
+        className="mt-1.5 w-full rounded-none border border-rule bg-surface px-3.5 py-2.5 text-[13px] text-ink outline-none placeholder:text-ink-3 focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/25"
       />
     </label>
   );

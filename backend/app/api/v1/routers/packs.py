@@ -11,8 +11,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 import app.schemas as s
-from app.db import DB
-from app.errors import ApiError, Code
+from app.core.db import DB
+from app.core.errors import ApiError, Code
 from app.models import Pack, PackVersion
 
 router = APIRouter(prefix="/packs", tags=["packs"])
@@ -108,7 +108,7 @@ def approve_version(pack_id: uuid.UUID, body: s.PackApprove, db: DB) -> s.PackVe
 
     draft: s.PackSpec | None = body.spec
     if draft is None and body.draft_session_id is not None:
-        from app.studio import (
+        from app.api.v1.routers.studio import (
             get_draft,
             mark_approved,
         )  # local import avoids a circular import

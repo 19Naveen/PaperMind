@@ -29,7 +29,7 @@ export function EditableLabel({
     return (
       <input
         autoFocus
-        className={`nodrag w-full rounded-[2px] border border-accent bg-surface px-1 py-0.5 text-inherit outline-none ${className ?? ''}`}
+        className={`nodrag w-full rounded-none border border-accent bg-surface px-1 py-0.5 text-inherit outline-none ${className ?? ''}`}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}

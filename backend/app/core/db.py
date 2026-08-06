@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Generator
-from typing import Annotated, ClassVar
-
-from fastapi import Depends
+from typing import ClassVar
 from sqlalchemy import create_engine
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
-from app.config import get_settings
+from app.core.config import get_settings
 
 settings = get_settings()
 
@@ -24,13 +21,3 @@ class Base(DeclarativeBase):
         list: JSONB,
     }
 
-
-def get_db() -> Generator[Session, None, None]:
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-DB = Annotated[Session, Depends(get_db)]

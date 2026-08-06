@@ -1,9 +1,11 @@
 'use client';
 
-import { startTransition, useEffect, useRef, useState } from 'react';
+import { startTransition, useEffect, useMemo, useRef, useState } from 'react';
 import type { PackSpec } from '@/lib/api';
+import { specToGraph } from '@/lib/types';
 import { approveAndInstallAction, createStudioSessionAction } from '@/lib/session';
-import { ActionButton, Card, CardKicker, EmptyState, PageHeader, Tag } from '@/components/ui';
+import { ActionButton, CardKicker, EmptyState, PageHeader, Seg, Tag } from '@/components/ui';
+import { GraphCanvas } from '@/components/GraphCanvas';
 
 interface ChatLine {
   role: 'user' | 'assistant';
@@ -22,6 +24,8 @@ export function PackBuilderView({ workspaceId, workspaceName }: { workspaceId: s
   const [packName, setPackName] = useState('');
   const [approving, setApproving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [view, setView] = useState<'diagram' | 'ports' | 'ledger'>('diagram');
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const draftRef = useRef<PackSpec | null>(null);
 
@@ -125,17 +129,42 @@ export function PackBuilderView({ workspaceId, workspaceName }: { workspaceId: s
   }
 
   const pending = streaming ? [...lines, { role: 'assistant' as const, content: '…' }] : lines;
+  const graph = useMemo(() => (draft ? specToGraph(draft) : { nodes: [], edges: [] }), [draft]);
+  const selectedNode = graph.nodes.find((node) => node.id === selectedNodeId) ?? null;
 
   return (
-    <main className="min-h-full bg-ground text-ink">
+    <main className="flex h-full min-h-0 flex-col bg-ground text-ink">
       <PageHeader
-        eyebrow="Pack Studio"
-        title={`Author a Pack for ${workspaceName}`}
-        actions={<Tag variant="neutral">{draft ? 'Draft ready' : 'Conversation mode'}</Tag>}
+        eyebrow={`Editing pack · ${workspaceName}`}
+        title={packName || `Author a Pack for ${workspaceName}`}
+        actions={
+          <>
+            <Seg
+              options={[
+                { value: 'diagram', label: 'Diagram' },
+                { value: 'ports', label: 'Ports' },
+                { value: 'ledger', label: 'Ledger' },
+              ]}
+              value={view}
+              onChange={setView}
+            />
+            <Tag variant="neutral">{draft ? 'Draft ready' : 'Conversation mode'}</Tag>
+            <ActionButton
+              variant="primary"
+              disabled={!draft || !packName.trim() || approving}
+              onClick={approve}
+            >
+              {approving ? 'Publishing…' : 'Publish'}
+            </ActionButton>
+          </>
+        }
       />
-      <div className="grid min-h-0 lg:grid-cols-[minmax(0,1fr)_380px]">
-        <section className="flex min-h-0 flex-col border-t-2 border-rule">
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-5">
+      <div className="flex min-h-0 flex-1 overflow-x-auto">
+        <section className="flex w-[360px] shrink-0 flex-col border-r-2 border-rule bg-surface">
+          <div className="border-b border-rule px-[18px] py-3">
+            <p className="eyebrow">Build conversation</p>
+          </div>
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-[18px] py-4">
             {pending.length === 0 && (
               <EmptyState
                 title="Describe the review you need"
@@ -147,14 +176,14 @@ export function PackBuilderView({ workspaceId, workspaceName }: { workspaceId: s
                 <p className={`eyebrow ${line.role === 'assistant' ? 'text-accent' : ''}`}>
                   {line.role === 'user' ? 'You' : 'Pack Studio'}
                 </p>
-                <p className="mt-1 whitespace-pre-line rounded-none border border-rule bg-surface px-3 py-2 text-left text-[13px] leading-relaxed text-ink-2">
+                <p className="mt-1 whitespace-pre-line text-left text-[13px] leading-relaxed text-ink-2">
                   {line.content}
                 </p>
               </article>
             ))}
           </div>
           <form
-            className="border-t-2 border-rule p-4"
+            className="border-t-2 border-rule p-[14px]"
             onSubmit={(event) => {
               event.preventDefault();
               void send(input);
@@ -172,77 +201,77 @@ export function PackBuilderView({ workspaceId, workspaceName }: { workspaceId: s
           </form>
         </section>
 
-        <aside className="border-t-2 border-rule bg-surface lg:border-l-2 lg:border-t-0">
-          <div className="border-b border-rule px-5 py-3">
-            <p className="eyebrow text-accent">Draft spec</p>
+        <section className="flex min-w-[520px] flex-1 flex-col bg-ground">
+          {view === 'diagram' && (
+            <GraphCanvas
+              nodes={graph.nodes}
+              edges={graph.edges}
+              onChange={() => {}}
+              onSelectNode={setSelectedNodeId}
+              readOnly
+            />
+          )}
+          {view === 'ports' && (
+            <div className="overflow-auto p-6">
+              <p className="eyebrow mb-4">Data ports · what each step reads and writes</p>
+              <div className="grid border-l border-t-2 border-rule sm:grid-cols-2 xl:grid-cols-3">
+                {graph.nodes.map((node, index) => (
+                  <article key={node.id} className="border-b border-r border-rule bg-ground p-4">
+                    <p className="eyebrow text-accent">{String(index + 1).padStart(2, '0')} · {node.kind.replace('_', ' ')}</p>
+                    <h2 className="display mt-1 text-[16px]">{node.label}</h2>
+                    <p className="mt-3 font-data text-[11px] text-ink-2">{node.detail ?? 'Defined by the Pack spec'}</p>
+                  </article>
+                ))}
+              </div>
+            </div>
+          )}
+          {view === 'ledger' && (
+            <div className="overflow-auto p-6">
+              <p className="eyebrow mb-4">Ledger · execution order</p>
+              <ol className="border-t-2 border-rule">
+                {graph.nodes.map((node, index) => (
+                  <li key={node.id} className="grid grid-cols-[56px_1fr] gap-4 border-b border-rule py-4">
+                    <span className="display text-[26px] leading-none text-accent">{String(index + 1).padStart(2, '0')}</span>
+                    <span><strong className="display block text-[17px]">{node.label}</strong><span className="text-[12px] text-ink-2">{node.detail ?? node.kind.replace('_', ' ')}</span></span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
+          <div className="flex items-center justify-between border-t border-rule px-4 py-2">
+            <span className="eyebrow">Workflow · {graph.nodes.length} nodes</span>
+            <span className="eyebrow text-accent">Live draft from conversation</span>
           </div>
-          <div className="space-y-4 px-5 py-4">
+        </section>
+
+        <aside className="w-[312px] shrink-0 overflow-y-auto border-l-2 border-rule bg-surface">
+          <div className="border-b border-rule px-4 py-3"><p className="eyebrow text-accent">Inspector</p></div>
+          <div className="space-y-5 p-4">
             {!draft ? (
-              <p className="text-[12.5px] leading-relaxed text-ink-2">
-                Fields, document types and rules land here as the studio drafts them.
-              </p>
+              <p className="text-[12.5px] leading-relaxed text-ink-2">Fields, document types and rules land here as the studio drafts them.</p>
+            ) : selectedNode ? (
+              <section>
+                <CardKicker>{selectedNode.kind.replace('_', ' ')}</CardKicker>
+                <h2 className="display mt-1 text-[18px]">{selectedNode.label}</h2>
+                <p className="mt-3 border-l-[3px] border-rule bg-raised p-3 text-[12.5px] leading-relaxed text-ink-2">{selectedNode.detail ?? 'Defined by the current Pack draft.'}</p>
+              </section>
             ) : (
               <>
                 <section>
-                  <CardKicker>Document types</CardKicker>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {draft.document_types.length > 0 ? (
-                      draft.document_types.map((type) => <Tag key={type}>{type}</Tag>)
-                    ) : (
-                      <Tag variant="outline">none</Tag>
-                    )}
-                  </div>
+                  <CardKicker>Pack contents</CardKicker>
+                  <p className="mt-2 text-[12.5px] leading-relaxed text-ink-2">Select a node to inspect it. The frozen Pack will contain the document types, fields and rules shown on the canvas.</p>
                 </section>
-                <section>
-                  <CardKicker>Fields to extract</CardKicker>
-                  <div className="mt-2 divide-y divide-rule border-y border-rule">
-                    {draft.fields.map((field) => (
-                      <div key={field.name} className="py-2">
-                        <p className="font-data text-[12px] font-medium text-ink">{field.name}</p>
-                        <p className="text-[11.5px] leading-relaxed text-ink-2">{field.description}</p>
-                        <p className="font-data text-[10px] uppercase tracking-[.08em] text-ink-3">{field.type}</p>
-                      </div>
-                    ))}
-                    {draft.fields.length === 0 && <p className="py-2 text-[12px] text-ink-2">No fields yet.</p>}
-                  </div>
-                </section>
-                <section>
-                  <CardKicker>Rules</CardKicker>
-                  <ul className="mt-2 space-y-1.5">
-                    {draft.rules.map((rule) => (
-                      <li key={rule.id} className="text-[12px] leading-relaxed text-ink-2">
-                        {rule.description}
-                      </li>
-                    ))}
-                    {draft.rules.length === 0 && <li className="text-[12px] text-ink-2">No rules yet.</li>}
-                  </ul>
-                </section>
-                <Card className="border border-rule p-3">
-                  <label htmlFor="pack-name" className="block text-[11.5px] font-medium text-ink-2">
-                    Pack name
-                  </label>
-                  <input
-                    id="pack-name"
-                    value={packName}
-                    onChange={(event) => setPackName(event.target.value)}
-                    className="mt-1 w-full border border-rule bg-surface px-2 py-1.5 font-data text-[12px] text-ink outline-none focus:border-accent"
-                  />
-                </Card>
-                {error && <p className="text-[12px] text-missing">{error}</p>}
-                <ActionButton
-                  variant="primary"
-                  className="w-full"
-                  disabled={!draft || !packName.trim() || approving}
-                  onClick={approve}
-                >
-                  {approving ? 'Approving…' : 'Approve & install'}
-                </ActionButton>
-                <p className="text-[10.5px] leading-relaxed text-ink-3">
-                  Approving freezes this spec as version 1 — it cannot be edited, only
-                  superseded — and installs it for this workspace.
-                </p>
+                <dl className="grid grid-cols-3 border-l border-t border-rule text-center">
+                  <div className="border-b border-r border-rule p-2"><dt className="eyebrow">Docs</dt><dd className="display mt-1 text-[20px]">{draft.document_types.length}</dd></div>
+                  <div className="border-b border-r border-rule p-2"><dt className="eyebrow">Fields</dt><dd className="display mt-1 text-[20px]">{draft.fields.length}</dd></div>
+                  <div className="border-b border-r border-rule p-2"><dt className="eyebrow">Rules</dt><dd className="display mt-1 text-[20px]">{draft.rules.length}</dd></div>
+                </dl>
               </>
             )}
+            <label htmlFor="pack-name" className="block text-[11.5px] font-medium text-ink-2">Pack name</label>
+            <input id="pack-name" value={packName} onChange={(event) => setPackName(event.target.value)} className="-mt-4 w-full border border-rule bg-raised px-2 py-1.5 font-data text-[12px] text-ink outline-none focus:border-accent" />
+            {error && <p className="text-[12px] text-missing">{error}</p>}
+            <p className="text-[10.5px] leading-relaxed text-ink-3">Publishing approves and installs version 1. Frozen versions are superseded, never edited in place.</p>
           </div>
         </aside>
       </div>

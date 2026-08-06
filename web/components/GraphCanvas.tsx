@@ -72,11 +72,13 @@ function Canvas({
   edges,
   onChange,
   onSelectNode,
+  readOnly,
 }: {
   nodes: FlowNode[];
   edges: FlowEdge[];
   onChange: (nodes: FlowNode[], edges: FlowEdge[]) => void;
   onSelectNode?: (id: string | null) => void;
+  readOnly: boolean;
 }) {
   // Stable dispatcher so it can be baked into node data at creation time
   // without going stale — the ref is repointed at the latest handleRename
@@ -212,12 +214,15 @@ function Canvas({
         nodes={rfNodes}
         edges={rfEdges}
         nodeTypes={nodeTypes}
-        onNodesChange={handleNodesChange}
-        onEdgesChange={handleEdgesChange}
-        onConnect={handleConnect}
+        onNodesChange={readOnly ? undefined : handleNodesChange}
+        onEdgesChange={readOnly ? undefined : handleEdgesChange}
+        onConnect={readOnly ? undefined : handleConnect}
         onNodeClick={(_, n) => onSelectNode?.(String(n.id))}
         onPaneClick={() => onSelectNode?.(null)}
-        deleteKeyCode={['Backspace', 'Delete']}
+        deleteKeyCode={readOnly ? null : ['Backspace', 'Delete']}
+        nodesConnectable={!readOnly}
+        nodesDraggable={!readOnly}
+        elementsSelectable
         defaultEdgeOptions={{ style: { stroke: 'var(--color-ink-2)', strokeWidth: 1.5 } }}
         fitView
       >
@@ -227,8 +232,8 @@ function Canvas({
           gap={28}
           size={1}
         />
-        <Controls className="!border !border-rule !bg-surface !shadow-sm [&_button]:!border-rule [&_button]:!bg-surface [&_button]:!text-ink [&_button:hover]:!bg-raised [&_svg]:!fill-ink" />
-        <Panel position="top-left">
+        <Controls showInteractive={!readOnly} className="!border !border-rule !bg-surface !shadow-sm [&_button]:!border-rule [&_button]:!bg-surface [&_button]:!text-ink [&_button:hover]:!bg-raised [&_svg]:!fill-ink" />
+        {!readOnly && <Panel position="top-left">
           <div className="flex gap-1.5 border border-rule bg-surface p-1.5 shadow-sm">
             <button
               onClick={() => addNode('document_type')}
@@ -249,7 +254,7 @@ function Canvas({
               + Rule
             </button>
           </div>
-        </Panel>
+        </Panel>}
         {nodes.length === 0 && (
           <Panel position="top-center">
             <div className="mt-24 flex max-w-xs flex-col items-center border border-dashed border-rule bg-surface px-6 py-6 text-center shadow-sm">
@@ -273,15 +278,17 @@ export function GraphCanvas({
   edges,
   onChange,
   onSelectNode,
+  readOnly = false,
 }: {
   nodes: FlowNode[];
   edges: FlowEdge[];
   onChange: (nodes: FlowNode[], edges: FlowEdge[]) => void;
   onSelectNode?: (id: string | null) => void;
+  readOnly?: boolean;
 }) {
   return (
     <ReactFlowProvider>
-      <Canvas nodes={nodes} edges={edges} onChange={onChange} onSelectNode={onSelectNode} />
+      <Canvas nodes={nodes} edges={edges} onChange={onChange} onSelectNode={onSelectNode} readOnly={readOnly} />
     </ReactFlowProvider>
   );
 }

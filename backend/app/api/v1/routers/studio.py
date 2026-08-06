@@ -12,11 +12,11 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 import app.schemas as s
-from app.db import DB
-from app.errors import ApiError, Code
-from app.llm import JSON_SCHEMA, get_providers
+from app.core.db import DB
+from app.core.errors import ApiError, Code
 from app.models import StudioSession
-from app.runtime import preview_document
+from app.services.llm import JSON_SCHEMA, get_providers
+from app.services.runtime import preview_document
 
 router = APIRouter(prefix="/studio", tags=["studio"])
 

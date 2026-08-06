@@ -18,10 +18,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 import app.schemas as s
-from app.auth import CurrentUser
-from app.db import DB
-from app.errors import ApiError, Code
-from app.llm import get_providers
+from app.api.deps import CurrentUser
+from app.core.db import DB
+from app.core.errors import ApiError, Code
 from app.models import (
     Chunk,
     Pack,
@@ -32,8 +31,9 @@ from app.models import (
     Workspace,
     WorkspaceSession,
 )
-from app.retrieval import search
-from app.runs import create_run_rows, run_task, serialize_run
+from app.api.v1.routers.runs import create_run_rows, run_task, serialize_run
+from app.services.llm import get_providers
+from app.services.retrieval import search
 
 router = APIRouter(prefix="/workspaces", tags=["workspaces"])
 

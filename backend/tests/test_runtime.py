@@ -5,7 +5,7 @@ load-bearing — a value without a real source sentence must NOT become verified
 from __future__ import annotations
 
 from app.models import Case, Fact, Pack, PackVersion, Run, RunDocument
-from app.runtime import execute_run
+from app.services.runtime import execute_run
 from tests.util import ingest_text, make_spec
 
 DOC_TEXT = (

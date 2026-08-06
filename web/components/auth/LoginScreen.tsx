@@ -65,7 +65,7 @@ export function LoginScreen() {
           autoComplete="current-password"
         />
         {error && (
-          <p className="flex items-center gap-1.5 text-[12px] text-missing">
+          <p role="alert" className="flex items-center gap-1.5 text-[12px] text-missing">
             <IconAlert width={13} height={13} className="shrink-0" />
             {error}
           </p>
@@ -74,7 +74,7 @@ export function LoginScreen() {
         <button
           type="submit"
           disabled={busy}
-          className="flex w-full items-center justify-center gap-1.5 rounded-md bg-accent px-4 py-2.5 text-[13px] font-medium text-accent-ink shadow-xs transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+          className="flex w-full items-center justify-center gap-1.5 rounded-none bg-accent px-4 py-2.5 text-[13px] font-medium text-accent-ink shadow-xs transition-all hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {busy ? 'Signing in…' : 'Sign in'}
           <IconArrowRight width={14} height={14} />

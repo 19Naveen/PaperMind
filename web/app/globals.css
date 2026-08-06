@@ -79,70 +79,12 @@
   --shadow-lg: 0 12px 32px rgb(32 30 29 / 0.22);
 }
 
-@media (prefers-color-scheme: dark) {
-  @theme {
-    --color-ground: #191715;
-    --color-surface: #211e1d;
-    --color-raised: #2a2624;
-    --color-inset: #171514;
-    --color-ink: #efe9e6;
-    --color-ink-2: #a8a09c;
-    --color-ink-3: #6e6763;
-    --color-rule: #3d3836;
-    --color-rule-2: #2b2725;
-
-    --color-neutral-100: #2a2624;
-    --color-neutral-200: #33302e;
-    --color-neutral-300: #46413f;
-    --color-neutral-400: #5d5754;
-    --color-neutral-500: #6e6763;
-    --color-neutral-600: #8a8380;
-    --color-neutral-700: #a8a09c;
-    --color-neutral-800: #c6c0bc;
-    --color-neutral-900: #e4dfdc;
-
-    --color-accent: #ff563c;
-    --color-accent-ink: #201e1d;
-    --color-accent-soft: #3a170f;
-    --color-accent-2: #ef6853;
-    --color-focus: #ff7860;
-
-    --color-accent-100: #3a170f;
-    --color-accent-200: #59190c;
-    --color-accent-300: #8a2009;
-    --color-accent-400: #d02c0a;
-    --color-accent-500: #ff563c;
-    --color-accent-600: #ff7860;
-    --color-accent-700: #ff9a84;
-    --color-accent-800: #ffb9a8;
-    --color-accent-900: #ffd9cc;
-
-    --color-verified: #46c896;
-    --color-verified-soft: #10352a;
-    --color-unsupported: #dfae56;
-    --color-unsupported-soft: #3a2d10;
-    --color-missing: #ff7676;
-    --color-missing-soft: #401a1e;
-
-    --color-running: #8ea2ff;
-    --color-running-soft: #1c2440;
-
-    --color-highlight: #3a2f12;
-    --color-highlight-edge: #a37d24;
-
-    --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.4);
-    --shadow-sm: 0 4px 14px -4px rgb(0 0 0 / 0.5);
-    --shadow-md: 0 12px 28px -8px rgb(0 0 0 / 0.55);
-    --shadow-lg: 0 26px 64px -18px rgb(0 0 0 / 0.65);
-  }
-}
-
 body {
   background: var(--color-ground);
   color: var(--color-ink);
   font-family: var(--font-sans);
   font-size: 15px;
-  line-height: 1.5;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
@@ -155,7 +97,7 @@ body {
 }
 
 /* Section eyebrow. Uppercase, tracked, quiet — this is what every block is. */
-.eyebrow {
+:where(.eyebrow) {
   font-size: 10px;
   font-weight: 500;
   letter-spacing: 0.1em;

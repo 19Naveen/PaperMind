@@ -9,7 +9,7 @@ import uuid
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from app.llm import get_providers
+from app.services.llm import get_providers
 from app.models import Chunk
 
 RRF_K = 60

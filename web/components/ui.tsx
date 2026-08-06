@@ -59,21 +59,33 @@ export function PageHeader({
   title,
   meta,
   actions,
+  compact = false,
+  brand,
+  navigation,
+  account,
 }: {
-  eyebrow: string;
-  title: ReactNode;
+  eyebrow?: string;
+  title?: ReactNode;
   meta?: ReactNode;
   actions?: ReactNode;
+  /** Align a route title with its actions in one navigation-height row. */
+  compact?: boolean;
+  /** Optional product mark for standalone, full-width navigation headers. */
+  brand?: ReactNode;
+  navigation?: ReactNode;
+  account?: ReactNode;
 }) {
   return (
-    <header className="border-b-2 border-rule bg-surface px-6 py-[18px]">
-      <div className="mx-auto flex max-w-[1400px] flex-wrap items-end justify-between gap-4">
-        <div className="min-w-0">
-          <p className="eyebrow text-accent">{eyebrow}</p>
-          <h1 className="display mt-1 text-[21px] font-extrabold leading-tight text-ink">{title}</h1>
+    <header className={`border-b-2 border-rule bg-ground px-4 sm:px-6 ${compact ? 'py-4' : 'py-[18px]'}`}>
+      <div className={`flex flex-wrap justify-between gap-4 ${compact ? 'items-center' : 'items-end'}`}>
+        {brand}
+        {navigation}
+        {(eyebrow || title) && <div className={`min-w-0 ${compact ? 'flex items-baseline gap-2.5' : ''}`}>
+          {eyebrow && <p className="eyebrow text-accent">{eyebrow}</p>}
+          {title && <h1 className={`display text-[21px] font-extrabold leading-tight text-ink ${compact ? '' : 'mt-1'}`}>{title}</h1>}
           {meta && <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[13.5px] text-ink-2">{meta}</div>}
-        </div>
-        {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+        </div>}
+        {(actions || account) && <div className="flex shrink-0 items-center gap-2">{actions}{account}</div>}
       </div>
     </header>
   );
@@ -88,7 +100,7 @@ type ButtonVariant = 'default' | 'primary' | 'secondary' | 'outline' | 'ghost' |
 type ButtonSize = 'sm' | 'md';
 
 const BTN_BASE =
-  'inline-flex items-center justify-center gap-1.5 rounded-none font-display font-extrabold cursor-pointer transition-colors duration-100 active:translate-y-px select-none';
+  'inline-flex items-center justify-center gap-1.5 rounded-none font-display font-extrabold cursor-pointer transition-colors duration-100 active:translate-y-px select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2';
 const BTN_SIZES: Record<ButtonSize, string> = {
   sm: 'px-[10px] py-1.5 text-[12.5px]',
   md: 'px-[14px] py-2 text-[13.5px]',
@@ -187,8 +199,8 @@ export function Card({
 }
 
 /** The card kicker — 10px tracked accent label. */
-export function CardKicker({ children }: { children: ReactNode }) {
-  return <p className="eyebrow text-accent font-medium">{children}</p>;
+export function CardKicker({ children, className = '' }: { children: ReactNode; className?: string }) {
+  return <p className={`eyebrow font-medium text-accent ${className}`} style={{ color: 'var(--color-accent)' }}>{children}</p>;
 }
 
 /** The card title — Archivo 800, sized per context via className. */
@@ -202,9 +214,9 @@ export function CardBody({ children, className = '' }: { children: ReactNode; cl
 }
 
 /** The card meta row — tiny muteds on a top rule. */
-export function CardMeta({ children }: { children: ReactNode }) {
+export function CardMeta({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <div className="flex items-center gap-1.5 border-t border-rule pt-3 text-[11px] text-ink-2/60">{children}</div>
+    <div className={`flex items-center gap-1.5 border-t border-rule pt-3 text-[11px] text-ink-3 ${className}`}>{children}</div>
   );
 }
 

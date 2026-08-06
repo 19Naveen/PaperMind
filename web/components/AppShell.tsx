@@ -3,85 +3,15 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
-import { IconChevronDown, IconCheck, IconHome, IconLibrary, IconPlus, IconSettings, IconUser } from '@/lib/icons';
+import { IconChevronDown, IconCheck, IconHome, IconLibrary, IconPlus } from '@/lib/icons';
 import type { User, WorkspaceOut } from '@/lib/api';
-import { signOutAction } from '@/lib/session';
-import { AuthProvider, initialsOf, useAuth } from './auth/AuthProvider';
+import { AuthProvider } from './auth/AuthProvider';
+import { HomeNavbar } from './HomeNavbar';
 
 function packLabel(workspace: WorkspaceOut): string {
   return workspace.pack_name && workspace.pack_version
     ? `${workspace.pack_name} ${workspace.pack_version}`
     : 'No pack';
-}
-
-/** Sidebar footer: the signed-in reviewer's identity, opening onto Profile/Settings/Sign out. */
-function AccountMenu() {
-  const { user } = useAuth();
-  const [open, setOpen] = useState(false);
-
-  if (!user) {
-    return (
-      <div className="border-t border-rule p-3">
-        <Link
-          href="/login"
-          className="flex items-center justify-center border border-rule px-3 py-2 text-[12px] font-medium text-ink transition-colors hover:border-ink-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-        >
-          Sign in
-        </Link>
-      </div>
-    );
-  }
-
-  return (
-    <div className="relative border-t border-rule">
-      {open && (
-        <div
-          id="account-menu"
-          className="absolute inset-x-3 bottom-[calc(100%-0.75rem)] z-20 border border-rule bg-surface py-1 shadow-[4px_4px_0_theme(colors.rule)]"
-        >
-          <Link
-            href="/profile"
-            onClick={() => setOpen(false)}
-            className="flex items-center gap-2 px-3 py-2 text-[12px] text-ink hover:bg-ink/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
-          >
-            <IconUser width={14} height={14} className="text-ink-3" />
-            Profile
-          </Link>
-          <Link
-            href="/settings"
-            onClick={() => setOpen(false)}
-            className="flex items-center gap-2 px-3 py-2 text-[12px] text-ink hover:bg-ink/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
-          >
-            <IconSettings width={14} height={14} className="text-ink-3" />
-            Settings
-          </Link>
-          {/* A Server Action: the session cookie is httpOnly, so only the server can drop it. */}
-          <form action={signOutAction} className="contents">
-            <button
-              type="submit"
-              className="flex w-full items-center gap-2 border-t border-rule px-3 py-2 text-left text-[12px] text-missing hover:bg-missing-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
-            >
-              Sign out
-            </button>
-          </form>
-        </div>
-      )}
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        aria-controls="account-menu"
-        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-ink/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
-      >
-        <span className="grid size-7 shrink-0 place-items-center bg-ink font-data text-[10px] font-bold text-ground">{initialsOf(user.name)}</span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[12px] font-medium text-ink">{user.name}</span>
-          <span className="block truncate text-[11px] text-ink-3">{user.role === 'admin' ? 'Admin' : 'Examiner'}</span>
-        </span>
-        <IconChevronDown width={14} height={14} className={`shrink-0 text-ink-3 transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
-    </div>
-  );
 }
 
 function RailLink({
@@ -106,18 +36,6 @@ function RailLink({
         {icon}
         <span className={`truncate ${active ? 'font-medium text-ink' : 'text-ink-2 group-hover:text-ink'}`}>{children}</span>
       </span>
-    </Link>
-  );
-}
-
-function Brand() {
-  return (
-    <Link
-      href="/"
-      className="flex items-center gap-2.5 px-4 py-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
-    >
-      <span className="size-3.5 bg-accent" />
-      <span className="font-display text-[16px] font-extrabold tracking-[0.14em] text-ink">PAPERMIND</span>
     </Link>
   );
 }
@@ -172,23 +90,23 @@ function WorkspaceRail({ workspace, workspaces, pathname }: { workspace: Workspa
 
   return (
     <>
-      <div className="relative border-b border-rule p-3">
+      <div className="relative border-b border-rule">
         <button
           type="button"
           onClick={() => setIsSwitcherOpen((open) => !open)}
           aria-expanded={isSwitcherOpen}
           aria-controls="workspace-switcher"
-          className="flex w-full items-center gap-2 border border-rule bg-raised px-3 py-2.5 text-left transition-colors hover:border-ink-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className="flex w-full items-center gap-2 bg-transparent px-4 py-3 text-left transition-colors hover:bg-ink/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
         >
           <span className="min-w-0 flex-1">
             <span className="block text-[10px] font-medium uppercase tracking-[0.1em] text-ink-3">Workspace · all</span>
-            <span className="block truncate pt-1 text-[13px] font-medium text-ink">{workspace.name}</span>
+            <span className="display block truncate pt-1 text-[15px] font-extrabold leading-tight text-ink">{workspace.name}</span>
             <span className="block truncate pt-0.5 font-data text-[10.5px] text-ink-3">{packLabel(workspace)}</span>
           </span>
           <IconChevronDown width={15} height={15} className={`shrink-0 text-ink-3 transition-transform ${isSwitcherOpen ? 'rotate-180' : ''}`} />
         </button>
         {isSwitcherOpen && (
-          <div id="workspace-switcher" className="absolute inset-x-3 top-[calc(100%-0.75rem)] z-20 border border-rule bg-surface py-1 shadow-[4px_4px_0_theme(colors.rule)]">
+          <div id="workspace-switcher" className="absolute inset-x-2 top-full z-20 max-h-[260px] overflow-auto border border-rule bg-surface py-1 shadow-lg">
             <Link
               href="/"
               onClick={() => setIsSwitcherOpen(false)}
@@ -216,7 +134,7 @@ function WorkspaceRail({ workspace, workspaces, pathname }: { workspace: Workspa
       </div>
       <nav className="border-b border-rule py-1.5" aria-label="Workspace navigation">
         <RailLink href={overviewHref} active={pathname === overviewHref}>Overview</RailLink>
-        <RailLink href={packHref} active={pathname === packHref}>Editing pack</RailLink>
+        <RailLink href={packHref} active={pathname === packHref}>Pack</RailLink>
       </nav>
       <section className="flex-1 overflow-y-auto py-4" aria-labelledby="sessions-label">
         <div className="flex items-center justify-between px-4 pb-2">
@@ -240,36 +158,6 @@ function WorkspaceRail({ workspace, workspaces, pathname }: { workspace: Workspa
   );
 }
 
-function MobileHeader({ workspace, pathname }: { workspace?: WorkspaceOut; pathname: string }) {
-  const isWorkspace = workspace !== undefined;
-  const overviewHref = workspace ? `/workspace/${workspace.id}` : '/';
-  const packHref = workspace ? `${overviewHref}/pack` : '/marketplace';
-
-  return (
-    <header className="flex min-h-14 items-center justify-between gap-3 border-b border-rule bg-surface px-4 md:hidden">
-      <Link href="/" className="font-display text-[13px] font-extrabold tracking-[0.12em] text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
-        PAPERMIND
-      </Link>
-      <nav className="flex items-center gap-1" aria-label="Mobile navigation">
-        <Link
-          href={overviewHref}
-          aria-current={(isWorkspace ? pathname === overviewHref : pathname === '/') ? 'page' : undefined}
-          className="px-2 py-1 text-[12px] text-ink-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-        >
-          {isWorkspace ? 'Overview' : 'Home'}
-        </Link>
-        <Link
-          href={packHref}
-          aria-current={(isWorkspace ? pathname === packHref : pathname === '/marketplace') ? 'page' : undefined}
-          className="px-2 py-1 text-[12px] text-ink-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-        >
-          {isWorkspace ? 'Pack' : 'Marketplace'}
-        </Link>
-      </nav>
-    </header>
-  );
-}
-
 export function AppShell({
   workspaces,
   user,
@@ -281,6 +169,7 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const isAuthRoute = pathname === '/login' || pathname === '/signup';
+  const isHomeRoute = pathname === '/';
   const workspaceId = pathname.match(/^\/workspace\/([^/]+)/)?.[1];
   const workspace = workspaceId ? workspaces.find((item) => item.id === workspaceId) : undefined;
 
@@ -289,15 +178,17 @@ export function AppShell({
 
   return (
     <AuthProvider user={user}>
-      <div className="flex min-h-screen bg-ground text-ink">
-        <aside className="hidden h-screen w-[266px] shrink-0 flex-col border-r border-rule bg-surface md:flex">
-          <Brand />
-          {workspace ? <WorkspaceRail workspace={workspace} workspaces={workspaces} pathname={pathname} /> : <HomeRail workspaces={workspaces} pathname={pathname} />}
-          <AccountMenu />
-        </aside>
-        <div className="flex min-w-0 flex-1 flex-col">
-          <MobileHeader workspace={workspace} pathname={pathname} />
-          <main className="min-w-0 flex-1">{children}</main>
+      <div className="flex h-dvh flex-col overflow-hidden bg-ground text-ink">
+        <HomeNavbar />
+        <div className="flex min-h-0 flex-1">
+          {!isHomeRoute && (
+          <aside className="hidden h-full w-[266px] shrink-0 flex-col overflow-hidden border-r-2 border-rule bg-ground md:flex">
+            {workspace ? <WorkspaceRail workspace={workspace} workspaces={workspaces} pathname={pathname} /> : <HomeRail workspaces={workspaces} pathname={pathname} />}
+          </aside>
+        )}
+        <div className="flex min-w-0 min-h-0 flex-1 flex-col">
+          <main className="min-h-0 min-w-0 flex-1 overflow-auto">{children}</main>
+        </div>
         </div>
       </div>
     </AuthProvider>
