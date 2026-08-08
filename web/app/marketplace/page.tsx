@@ -1,4 +1,4 @@
-import { getMe, listPacks, listWorkspaces } from '@/lib/api';
+import { getMe, listPacks } from '@/lib/api';
 import { redirect } from 'next/navigation';
 import { PageHeader } from '@/components/ui';
 import { MarketGrid } from './MarketGrid';
@@ -6,13 +6,13 @@ import { MarketGrid } from './MarketGrid';
 export default async function MarketplacePage() {
   const user = await getMe();
   if (!user) redirect('/login');
-  const [packs, workspaces] = await Promise.all([listPacks(100), listWorkspaces(200)]);
+  const packs = await listPacks(100);
 
   return (
     <div className="min-h-full">
       {packs.length === 0 ? (
         <>
-          <PageHeader eyebrow="Marketplace" title="Published packs" />
+          <PageHeader eyebrow="Marketplace" title="Browse Knowledge Packs" meta="Reviewed, versioned document workflows published by teams like yours." />
           <div className="mx-auto mt-16 max-w-md px-6 text-center">
             <p className="eyebrow text-accent">Nothing published yet</p>
             <h2 className="display mt-2 text-[23px] font-extrabold">No packs to install</h2>
@@ -20,7 +20,7 @@ export default async function MarketplacePage() {
           </div>
         </>
       ) : (
-        <MarketGrid packs={packs} workspaces={workspaces} />
+        <MarketGrid packs={packs} />
       )}
     </div>
   );
