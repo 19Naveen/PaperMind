@@ -1,41 +1,30 @@
 import type { ReactNode } from 'react';
 
-/**
- * The sign-in frame — an instrument card, not a marketing fold. Left panel
- * carries the brand mark and the operational pitch; the right panel hosts the
- * form. Drops to a single, centered column on mobile.
- */
 export function AuthFrame({ eyebrow, pitch, children }: { eyebrow: string; pitch: string; children: ReactNode }) {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-ground px-4 py-10">
-      <div className="w-full max-w-[900px] overflow-hidden border border-rule bg-surface shadow-sm">
-        <div className="grid md:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-          <aside className="hidden flex-col justify-between border-r border-rule bg-raised p-8 md:flex">
-            <div>
-              <div className="flex items-center gap-2.5">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center border border-rule bg-surface font-data text-[13px] font-bold text-accent">
-                  P
-                </span>
-                <div className="min-w-0">
-                  <p className="display text-[15px] leading-none text-ink">PaperMind</p>
-                  <p className="mt-1 font-data text-[9.5px] uppercase tracking-[0.18em] text-ink-3">{eyebrow}</p>
-                </div>
-              </div>
-              <p className="display mt-12 max-w-[220px] text-[22px] leading-snug text-ink">{pitch}</p>
+    <main className="grid min-h-screen grid-cols-1 bg-surface [@media(min-width:981px)]:grid-cols-[minmax(430px,1.08fr)_minmax(420px,0.92fr)]">
+      <aside className="hidden flex-col justify-between bg-[#111116] p-12 text-white [@media(min-width:981px)]:flex">
+        <div>
+          <div className="flex items-center gap-3">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[linear-gradient(145deg,#7373ee,#4d4dc6)] text-[15px] font-semibold text-white shadow-[0_5px_16px_rgba(72,72,197,0.28)]">P</span>
+            <div className="min-w-0">
+              <p className="text-[19px] font-semibold leading-none tracking-[-0.025em]">PaperMind</p>
+              <p className="mt-2 font-data text-[9.5px] uppercase tracking-[0.18em] text-white/45">{eyebrow}</p>
             </div>
-
-            <div className="space-y-1.5 border-t border-rule pt-4">
-              <p className="font-data text-[10px] uppercase tracking-[0.14em] text-ink-3">Operational note</p>
-              <p className="font-data text-[10px] leading-relaxed text-ink-3">
-                local draft — no real credentials
-                <br />
-                sign-in is mocked until the service lands
-              </p>
+          </div>
+          <p className="mt-[10vh] max-w-[540px] text-[clamp(34px,4vw,52px)] font-semibold leading-[1.06] tracking-[-0.055em] text-white">{pitch}</p>
+          <div className="mt-12 max-w-[420px] space-y-5 text-white/70">
+            <p className="text-[13px] leading-relaxed">Build a review workflow once, then run it against any document set with the same rules and a citation behind every fact.</p>
+            <div className="grid gap-3 text-[12px]">
+              <p><b className="text-white">Author once</b><br />Conversational drafting, human review, then a frozen spec.</p>
+              <p><b className="text-white">Evidence first</b><br />No citation, no result. Gaps are flagged, never guessed.</p>
+              <p><b className="text-white">Version everything</b><br />Every run records the exact Pack version that produced it.</p>
             </div>
-          </aside>
-
-          <div className="p-6 sm:p-8">{children}</div>
+          </div>
         </div>
+      </aside>
+      <div className="grid place-items-center overflow-auto bg-[linear-gradient(180deg,#ffffff,#fbfbfc)] p-8">
+        <div className="w-full max-w-[390px]">{children}</div>
       </div>
     </main>
   );

@@ -63,11 +63,8 @@ export function SignupScreen() {
 
   return (
     <AuthFrame eyebrow="Self-registration · draft" pitch="A reviewer identity. Every result cites its source.">
-      <p className="eyebrow">Account · Draft</p>
-      <h1 className="display mt-1 text-[24px] leading-tight text-ink">Create your account</h1>
-      <p className="mt-1.5 text-[13px] leading-relaxed text-ink-2">
-        An examiner identity for the console. Your account is created on first sign-up.
-      </p>
+      <h1 className="display text-[26px] font-semibold tracking-[-0.035em] text-ink">Create your account</h1>
+      <p className="mb-[26px] mt-[7px] text-[13.5px] text-ink-2">An examiner identity for the console. Your account is created on first sign-up.</p>
 
       <form onSubmit={onSubmit} className="mt-6 space-y-4" noValidate>
         <Field label="Name" value={name} onChange={setName} placeholder="Ada Lovelace" autoComplete="name" />
@@ -113,12 +110,10 @@ export function SignupScreen() {
         </button>
       </form>
 
-      <div className="mt-6 flex items-center justify-between border-t border-rule-2 pt-4">
-        <p className="text-[12px] text-ink-3">Already have an account?</p>
-        <Link href="/login" className="text-[12.5px] font-medium text-accent hover:underline">
-          Sign in
-        </Link>
-      </div>
+      <p className="mt-5 text-center text-[12px] text-ink-3">
+        Already have an account?{' '}
+        <Link href="/login" className="font-semibold text-accent hover:underline">Sign in</Link>
+      </p>
     </AuthFrame>
   );
 }

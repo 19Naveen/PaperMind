@@ -6,7 +6,7 @@ import type { FormEvent } from 'react';
 import { signInAction } from '@/lib/session';
 import { AuthFrame } from './AuthFrame';
 import { Field } from './AuthField';
-import { IconAlert, IconArrowRight, IconCheck } from '@/lib/icons';
+import { IconAlert, IconArrowRight } from '@/lib/icons';
 import type { AuthFailure } from '@/lib/session';
 
 /** Branch on the API's error `code`, never its message (CLAUDE.md §3.4 / §4.4). */
@@ -41,11 +41,8 @@ export function LoginScreen() {
 
   return (
     <AuthFrame eyebrow="Evidence instrument" pitch="Author once. Execute many times.">
-      <p className="eyebrow">Security · Sign in</p>
-      <h1 className="display mt-1 text-[24px] leading-tight text-ink">Sign in</h1>
-      <p className="mt-1.5 text-[13px] leading-relaxed text-ink-2">
-        Access the reviewer&apos;s console. Every result cites its source.
-      </p>
+      <h1 className="display text-[26px] font-semibold tracking-[-0.035em] text-ink">Welcome back</h1>
+      <p className="mb-[26px] mt-[7px] text-[13.5px] text-ink-2">Sign in to your reviewer console.</p>
 
       <form onSubmit={onSubmit} className="mt-6 space-y-4">
         <Field
@@ -81,17 +78,10 @@ export function LoginScreen() {
         </button>
       </form>
 
-      <p className="mt-3 flex items-center gap-1.5 text-[11px] text-ink-3">
-        <IconCheck width={12} height={12} className="text-verified" />
-        Demo account — ada@papermind.io / papermind123
+      <p className="mt-5 text-center text-[12px] text-ink-3">
+        New to PaperMind?{' '}
+        <Link href="/signup" className="font-semibold text-accent hover:underline">Create an account</Link>
       </p>
-
-      <div className="mt-6 flex items-center justify-between border-t border-rule-2 pt-4">
-        <p className="text-[12px] text-ink-3">No workspace yet?</p>
-        <Link href="/signup" className="text-[12.5px] font-medium text-accent hover:underline">
-          Create a workspace
-        </Link>
-      </div>
     </AuthFrame>
   );
 }
