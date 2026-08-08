@@ -1,12 +1,15 @@
 import type { Metadata } from 'next';
-import { Archivo, JetBrains_Mono } from 'next/font/google';
+import { Inter, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import { AppShell } from '@/components/AppShell';
 import { getMe, listWorkspaces } from '@/lib/api';
 
-// The modernist face: one family for body (400) and display (800).
-const archivo = Archivo({ variable: '--font-archivo', subsets: ['latin'], weight: ['400', '500', '600', '800'] });
+// Inter is shared by display and body in the PaperMind 2.0 system.
+const inter = Inter({ variable: '--font-inter', subsets: ['latin'], weight: ['400', '500', '600', '700'] });
 const jetbrains = JetBrains_Mono({ variable: '--font-jetbrains', subsets: ['latin'], weight: ['400', '500'] });
+
+/* Keep the data face available for ledger and locator content. */
+const fonts = `${inter.variable} ${jetbrains.variable}`;
 
 export const metadata: Metadata = {
   title: 'PaperMind',
@@ -20,7 +23,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const workspaces = user ? await listWorkspaces() : [];
 
   return (
-    <html lang="en" className={`${archivo.variable} ${jetbrains.variable} h-full`}>
+    <html lang="en" className={`${fonts} h-full`}>
       <body className="h-full antialiased">
         <AppShell workspaces={workspaces} user={user}>
           {children}

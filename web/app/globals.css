@@ -1,207 +1,97 @@
 @import "tailwindcss";
 
-/*
-  PaperMind — "Modernist", ported from the Workspace pack-builder prototype.
-
-  Warm paper ground, ink-tinted hairline dividers, a single display face
-  (Archivo) and a flat red-orange action color. Sharp corners throughout —
-  zero radius is the signature. Color is reserved for state and action,
-  never decoration. Token *names* stay stable so the rest of the app only
-  sees new values.
-*/
+/* PaperMind 2.0 shared visual system. */
 @theme {
-  --font-display: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
-  --font-sans: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
-  --font-data: var(--font-jetbrains), ui-monospace, "SF Mono", monospace;
+  --font-display: var(--font-inter), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: var(--font-inter), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-data: var(--font-jetbrains), ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  /* Paper surfaces */
-  --color-ground: #f3f2f2;
-  --color-surface: #eae9e9;
-  --color-raised: #f8f4f4;
-  --color-inset: #e7e4e4;
-  --color-ink: #201e1d;
-  --color-ink-2: #615d5d;
-  --color-ink-3: #9b9797;
-  --color-rule: #a5a09f;
-  --color-rule-2: #cdc9c8;
+  --color-ground: #f6f7f9;
+  --color-surface: #ffffff;
+  --color-raised: #ffffff;
+  --color-inset: #f0f1f4;
+  --color-ink: #18181b;
+  --color-ink-2: #52525b;
+  --color-ink-3: #6f6f78;
+  --color-rule: #e7e7eb;
+  --color-rule-2: #d6d7dd;
+  --color-neutral-100: #ffffff;
+  --color-neutral-200: #f6f7f9;
+  --color-neutral-300: #f0f1f4;
+  --color-neutral-400: #d6d7dd;
+  --color-neutral-500: #b9bac2;
+  --color-neutral-600: #6f6f78;
+  --color-neutral-700: #52525b;
+  --color-neutral-800: #27272a;
+  --color-neutral-900: #18181b;
 
-  /* Warm neutral ramp — shared lightness scale, matches the prototype. */
-  --color-neutral-100: #f8f4f4;
-  --color-neutral-200: #eae7e7;
-  --color-neutral-300: #d7d3d3;
-  --color-neutral-400: #bab6b6;
-  --color-neutral-500: #9b9797;
-  --color-neutral-600: #7d7979;
-  --color-neutral-700: #605d5d;
-  --color-neutral-800: #444141;
-  --color-neutral-900: #2d2b2b;
+  --color-accent: #5b5bd6;
+  --color-accent-2: #4f4fc6;
+  --color-accent-deep: #3f3fa8;
+  --color-accent-ink: #ffffff;
+  --color-accent-soft: #eeeeff;
+  --color-accent-softer: #f6f6ff;
+  --color-accent-line: #cecef8;
+  --color-focus: #7777ee;
+  --color-accent-100: #f6f6ff;
+  --color-accent-200: #eeeeff;
+  --color-accent-300: #cecef8;
+  --color-accent-400: #a6a6ee;
+  --color-accent-500: #7777e4;
+  --color-accent-600: #5b5bd6;
+  --color-accent-700: #4f4fc6;
+  --color-accent-800: #3f3fa8;
+  --color-accent-900: #2d2d78;
 
-  /* Brand / actions */
-  --color-accent: #ec3013;
-  --color-accent-ink: #f3f2f2;
-  --color-accent-soft: #fff2ef;
-  --color-accent-2: #e15b47;
-  --color-focus: #dd2b0f;
-
-  --color-accent-100: #fff2ef;
-  --color-accent-200: #ffe0d9;
-  --color-accent-300: #ffc4b8;
-  --color-accent-400: #ff9783;
-  --color-accent-500: #ff563c;
-  --color-accent-600: #dd2b0f;
-  --color-accent-700: #ae1800;
-  --color-accent-800: #7c1405;
-  --color-accent-900: #4d170e;
-
-  /* Fact state. Never decorative — if it's colored, it's a state. */
-  --color-verified: #0b6b4f;
-  --color-verified-soft: #e3f4ee;
-  --color-unsupported: #9a5b00;
-  --color-unsupported-soft: #fbf1dd;
-  --color-missing: #b41f36;
-  --color-missing-soft: #fde9ec;
-
-  /* Operational, non-fact signals. */
-  --color-running: #3557c7;
-  --color-running-soft: #e8edfb;
-
-  /* Transilluminated span in the evidence viewer. */
-  --color-highlight: #ffe8a3;
+  --color-verified: #117353;
+  --color-verified-soft: #eaf8f2;
+  --color-unsupported: #a15c08;
+  --color-unsupported-soft: #fff7e6;
+  --color-unsupported-line: #f0d49b;
+  --color-missing: #c53434;
+  --color-missing-soft: #fff0f0;
+  --color-missing-line: #f3c0c0;
+  --color-running: #5b5bd6;
+  --color-running-soft: #eeeeff;
+  --color-highlight: #fff0a8;
   --color-highlight-edge: #d9a53c;
 
-  --radius-sm: 0px;
-  --radius-md: 0px;
-  --radius-lg: 0px;
-
-  --shadow-xs: 0 1px 2px rgb(32 30 29 / 0.14);
-  --shadow-sm: 0 1px 2px rgb(32 30 29 / 0.14), 0 2px 6px rgb(32 30 29 / 0.1);
-  --shadow-md: 0 3px 10px rgb(32 30 29 / 0.16);
-  --shadow-lg: 0 12px 32px rgb(32 30 29 / 0.22);
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --shadow-xs: 0 1px 2px rgb(18 18 23 / 0.04);
+  --shadow-sm: 0 1px 2px rgb(18 18 23 / 0.05), 0 8px 24px rgb(18 18 23 / 0.07);
+  --shadow-md: 0 4px 12px rgb(18 18 23 / 0.10), 0 24px 48px rgb(18 18 23 / 0.14);
+  --shadow-lg: 0 18px 60px rgb(18 18 23 / 0.16), 0 2px 8px rgb(18 18 23 / 0.08);
 }
 
-body {
-  background: var(--color-ground);
-  color: var(--color-ink);
-  font-family: var(--font-sans);
-  font-size: 15px;
-  line-height: 1.55;
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
-}
+:root { --topbar-h: 60px; }
+html, body { background: var(--color-ground); }
+body { color: var(--color-ink); font-family: var(--font-sans); font-size: 13.5px; line-height: 1.55; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+body::before { display: none; }
+.display { font-family: var(--font-display); font-weight: 650; letter-spacing: -0.035em; }
+.page-title { font-size: 25px; font-weight: 650; letter-spacing: -0.035em; }
+.page-sub, .muted, .fineprint { color: var(--color-ink-3); }
+.eyebrow { font-size: 10px; font-weight: 700; letter-spacing: .105em; color: var(--color-accent); }
+.stamp { border-color: var(--color-rule); border-radius: var(--radius-sm); background: #fafafa; }
+.evidence-span { background: var(--color-highlight); box-shadow: inset 2px 0 var(--color-highlight-edge); }
+:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+* { scrollbar-color: var(--color-rule-2) transparent; }
+*::-webkit-scrollbar { width: 9px; height: 9px; }
+*::-webkit-scrollbar-thumb { background: #c7c8cf; border: 2.5px solid transparent; background-clip: content-box; border-radius: 8px; }
+::selection { background: var(--color-accent-soft); color: var(--color-ink); }
 
-/* Display face runs tight bold like the prototype headlines. */
-.display {
-  font-family: var(--font-display);
-  font-weight: 800;
-  letter-spacing: -0.015em;
-}
+/* Shared 2.0 surface language for legacy component selectors. */
+.sidebar { background: #151519; color: #f4f4f5; }
+.topbar { min-height: var(--topbar-h); background: rgb(255 255 255 / .84); border-color: var(--color-rule); }
+.card, .panel, .stats, .stat, .set-card, .login-card { background: #fff; border-color: var(--color-rule); border-radius: var(--radius-lg); box-shadow: var(--shadow-xs); }
+.btn, .input, .iconbtn, .chip, .searchbtn { border-radius: var(--radius-md); }
+.btn.primary, .iconbtn.acc { background: #202024; border-color: #202024; color: #fff; }
+.btn.primary:hover, .iconbtn.acc:hover { background: #09090b; border-color: #09090b; }
+.btn.outline { color: var(--color-accent); border-color: var(--color-accent); }
+.nav-item { border-radius: var(--radius-md); }
+.nav-item.is-active { background: rgb(116 116 238 / .17); color: #dadaff; }
 
-/* Section eyebrow. Uppercase, tracked, quiet — this is what every block is. */
-:where(.eyebrow) {
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--color-ink-2);
-}
-
-/* The signature: a bates-style locator stamp. */
-.stamp {
-  font-family: var(--font-data);
-  font-size: 10px;
-  letter-spacing: 0.04em;
-  border: 1px solid var(--color-rule);
-  border-radius: 0;
-  padding: 1px 6px;
-  color: var(--color-ink-2);
-  white-space: nowrap;
-  background: var(--color-surface);
-}
-
-/* The cited span, lit up inside its source. */
-.evidence-span {
-  background: var(--color-highlight);
-  box-shadow: inset 2px 0 0 var(--color-highlight-edge);
-  color: var(--color-ink);
-  padding: 1px 0;
-}
-
-@keyframes sweep {
-  from { clip-path: inset(0 100% 0 0); }
-  to { clip-path: inset(0 0 0 0); }
-}
-.sweep {
-  animation: sweep 420ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
-}
-
-/* Keyboard hint chip (⌘K and friends). */
-.kbd {
-  font-family: var(--font-data);
-  font-size: 10px;
-  letter-spacing: 0.02em;
-  color: var(--color-ink-2);
-  border: 1px solid var(--color-rule);
-  border-bottom-width: 2px;
-  border-radius: 0;
-  padding: 0 5px;
-  line-height: 1.6;
-  background: var(--color-raised);
-  white-space: nowrap;
-}
-
-/* A quiet index strip — the readout bar that tells you what the console knows. */
-.readout {
-  font-family: var(--font-data);
-  font-size: 10px;
-  letter-spacing: 0.03em;
-  color: var(--color-ink-3);
-  white-space: nowrap;
-}
-
-:focus-visible {
-  outline: none;
-}
-:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 2px;
-}
-
-/* Thin, low-noise scrollbars true to the workspace ethos. */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-rule) transparent;
-}
-*::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-*::-webkit-scrollbar-track {
-  background: transparent;
-}
-*::-webkit-scrollbar-thumb {
-  background: var(--color-rule);
-  border-radius: 8px;
-  border: 2px solid transparent;
-  background-clip: content-box;
-}
-*::-webkit-scrollbar-thumb:hover {
-  background: var(--color-ink-3);
-  border: 2px solid transparent;
-  background-clip: content-box;
-}
-
-::selection {
-  background: color-mix(in srgb, var(--color-accent) 30%, transparent);
-  color: var(--color-ink);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .sweep {
-    animation: none;
-  }
-  * {
-    transition-duration: 0.01ms !important;
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-  }
-}
+@keyframes sweep { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0); } }
+.sweep { animation: sweep 420ms cubic-bezier(.22,.61,.36,1) both; }
+@media (prefers-reduced-motion: reduce) { .sweep { animation: none; } * { transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }

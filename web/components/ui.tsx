@@ -32,14 +32,14 @@ export function StateBadge({ state, solid }: { state: FactState; solid?: boolean
   const s = STATE[state];
   if (solid) {
     return (
-      <span className={`inline-flex items-center gap-1 rounded-none px-1.5 py-px font-data text-[10px] uppercase tracking-wider ${s.solid}`}>
+      <span className={`inline-flex items-center gap-1 rounded-sm px-1.5 py-px font-data text-[10px] uppercase tracking-wider ${s.solid}`}>
         <span aria-hidden>{s.glyph}</span>
         {s.label}
       </span>
     );
   }
   return (
-    <span className={`inline-flex items-center gap-1 rounded-none border px-1.5 py-px font-data text-[10px] uppercase tracking-wider ${s.cls}`}>
+    <span className={`inline-flex items-center gap-1 rounded-sm border px-1.5 py-px font-data text-[10px] uppercase tracking-wider ${s.cls}`}>
       <span aria-hidden>{s.glyph}</span>
       {s.label}
     </span>
@@ -76,7 +76,7 @@ export function PageHeader({
   account?: ReactNode;
 }) {
   return (
-    <header className={`border-b-2 border-rule bg-ground px-4 sm:px-6 ${compact ? 'py-4' : 'py-[18px]'}`}>
+    <header className={`border-b border-rule bg-ground px-4 sm:px-6 ${compact ? 'py-4' : 'py-[18px]'}`}>
       <div className={`flex flex-wrap justify-between gap-4 ${compact ? 'items-center' : 'items-end'}`}>
         {brand}
         {navigation}
@@ -100,7 +100,7 @@ type ButtonVariant = 'default' | 'primary' | 'secondary' | 'outline' | 'ghost' |
 type ButtonSize = 'sm' | 'md';
 
 const BTN_BASE =
-  'inline-flex items-center justify-center gap-1.5 rounded-none font-display font-extrabold cursor-pointer transition-colors duration-100 active:translate-y-px select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2';
+  'inline-flex items-center justify-center gap-1.5 rounded-md font-sans font-semibold cursor-pointer transition-colors duration-100 active:translate-y-px select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2';
 const BTN_SIZES: Record<ButtonSize, string> = {
   sm: 'px-[10px] py-1.5 text-[12.5px]',
   md: 'px-[14px] py-2 text-[13.5px]',
