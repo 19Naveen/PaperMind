@@ -159,8 +159,8 @@ export function PackBuilderView({ workspaceId, workspaceName }: { workspaceId: s
           </>
         }
       />
-      <div className="flex min-h-0 flex-1 overflow-x-auto">
-        <section className="flex w-[360px] shrink-0 flex-col border-r-2 border-rule bg-surface">
+      <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto bg-[#f5f7fb] p-3">
+        <section className="flex w-[360px] shrink-0 flex-col border border-rule bg-surface shadow-sm">
           <div className="border-b border-rule px-[18px] py-3">
             <p className="eyebrow">Build conversation</p>
           </div>
@@ -201,7 +201,7 @@ export function PackBuilderView({ workspaceId, workspaceName }: { workspaceId: s
           </form>
         </section>
 
-        <section className="flex min-w-[520px] flex-1 flex-col bg-ground">
+        <section className="flex min-w-[520px] flex-1 flex-col border border-rule bg-white shadow-sm">
           {view === 'diagram' && (
             <GraphCanvas
               nodes={graph.nodes}
@@ -244,7 +244,7 @@ export function PackBuilderView({ workspaceId, workspaceName }: { workspaceId: s
           </div>
         </section>
 
-        <aside className="w-[312px] shrink-0 overflow-y-auto border-l-2 border-rule bg-surface">
+        <aside className="w-[312px] shrink-0 overflow-y-auto border border-rule bg-surface shadow-sm">
           <div className="border-b border-rule px-4 py-3"><p className="eyebrow text-accent">Inspector</p></div>
           <div className="space-y-5 p-4">
             {!draft ? (

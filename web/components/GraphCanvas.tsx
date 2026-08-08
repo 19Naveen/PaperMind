@@ -209,7 +209,7 @@ function Canvas({
   }, [edges, setRfEdges]);
 
   return (
-    <div className="relative min-w-0 flex-1 bg-ground">
+    <div className="relative min-w-0 flex-1 bg-[#f8fafc]">
       <ReactFlow
         nodes={rfNodes}
         edges={rfEdges}

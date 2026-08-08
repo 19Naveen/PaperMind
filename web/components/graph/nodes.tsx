@@ -14,7 +14,7 @@ export type GraphNodeData = {
 type GraphNode = Node<GraphNodeData>;
 
 const shell =
-  'min-w-[168px] max-w-[220px] bg-surface border border-rule px-3 py-2 text-[13px] text-ink shadow-sm transition-[border-color,box-shadow] hover:border-accent hover:shadow-md';
+  'min-w-[168px] max-w-[220px] rounded-[3px] bg-white border border-[#d9deea] px-3 py-2.5 text-[13px] text-ink shadow-[0_4px_14px_rgba(30,41,59,0.08)] transition-[border-color,box-shadow] hover:border-accent hover:shadow-[0_8px_20px_rgba(30,41,59,0.12)]';
 
 const kicker = 'text-[9.5px] tracking-[0.1em] uppercase text-accent';
 
