@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { IconChevronDown, IconCheck, IconHome, IconLibrary, IconPlus } from '@/lib/icons';
 import { IconClose } from '@/lib/icons';
 import type { User, WorkspaceOut } from '@/lib/api';
@@ -170,7 +170,6 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const [isRailOpen, setIsRailOpen] = useState(false);
-  useEffect(() => setIsRailOpen(false), [pathname]);
   const isAuthRoute = pathname === '/login' || pathname === '/signup';
   const isHomeRoute = pathname === '/';
   const workspaceId = pathname.match(/^\/workspace\/([^/]+)/)?.[1];
