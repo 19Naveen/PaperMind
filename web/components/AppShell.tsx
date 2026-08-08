@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { IconChevronDown, IconCheck, IconHome, IconLibrary, IconPlus } from '@/lib/icons';
+import { IconClose } from '@/lib/icons';
 import type { User, WorkspaceOut } from '@/lib/api';
 import { AuthProvider } from './auth/AuthProvider';
 import { HomeNavbar } from './HomeNavbar';
@@ -29,12 +30,12 @@ function RailLink({
     <Link
       href={href}
       aria-current={active ? 'page' : undefined}
-      className="group flex min-h-10 items-stretch transition-colors hover:bg-ink/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
+      className="group flex min-h-9 items-stretch rounded-lg transition-colors hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#5b5bd6]"
     >
-      <span className={`w-[3px] shrink-0 ${active ? 'bg-accent' : 'bg-transparent'}`} />
-      <span className="flex min-w-0 flex-1 items-center gap-2.5 px-3.5 py-2 text-[13px]">
+      <span className={`w-0.5 shrink-0 rounded-r ${active ? 'bg-[#8585ef]' : 'bg-transparent'}`} />
+      <span className={`flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2.5 py-2 text-[12.75px] ${active ? 'bg-[#5b5bd6]/[0.17]' : ''}`}>
         {icon}
-        <span className={`truncate ${active ? 'font-medium text-ink' : 'text-ink-2 group-hover:text-ink'}`}>{children}</span>
+        <span className={`truncate ${active ? 'font-semibold text-[#dadaff]' : 'text-[#a7a7b1] group-hover:text-white'}`}>{children}</span>
       </span>
     </Link>
   );
@@ -67,12 +68,12 @@ function HomeRail({ workspaces, pathname }: { workspaces: WorkspaceOut[]; pathna
                 key={workspace.id}
                 href={`/workspace/${workspace.id}`}
                 aria-current={active ? 'page' : undefined}
-                className="group flex items-stretch transition-colors hover:bg-ink/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
+                className="group flex items-stretch rounded-lg transition-colors hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#5b5bd6]"
               >
-                <span className={`w-[3px] shrink-0 ${active ? 'bg-accent' : 'bg-transparent'}`} />
-                <span className="min-w-0 flex-1 px-3.5 py-2">
-                  <span className="block truncate text-[13px] font-medium text-ink">{workspace.name}</span>
-                  <span className="block truncate pt-0.5 font-data text-[10.5px] text-ink-3">{packLabel(workspace)}</span>
+                <span className={`w-0.5 shrink-0 rounded-r ${active ? 'bg-[#8585ef]' : 'bg-transparent'}`} />
+                <span className="min-w-0 flex-1 px-2.5 py-2">
+                  <span className="block truncate text-[12.75px] font-medium text-[#f4f4f5]">{workspace.name}</span>
+                  <span className="block truncate pt-0.5 font-data text-[10px] text-[#8a8a95]">{packLabel(workspace)}</span>
                 </span>
               </Link>
             );
@@ -101,7 +102,7 @@ function WorkspaceRail({ workspace, workspaces, pathname }: { workspace: Workspa
           <span className="min-w-0 flex-1">
             <span className="block text-[10px] font-medium uppercase tracking-[0.1em] text-ink-3">Workspace · all</span>
             <span className="display block truncate pt-1 text-[15px] font-extrabold leading-tight text-ink">{workspace.name}</span>
-            <span className="block truncate pt-0.5 font-data text-[10.5px] text-ink-3">{packLabel(workspace)}</span>
+            <span className="block truncate pt-0.5 font-data text-[10px] text-[#8a8a95]">{packLabel(workspace)}</span>
           </span>
           <IconChevronDown width={15} height={15} className={`shrink-0 text-ink-3 transition-transform ${isSwitcherOpen ? 'rotate-180' : ''}`} />
         </button>
@@ -168,6 +169,8 @@ export function AppShell({
   children: ReactNode;
 }) {
   const pathname = usePathname();
+  const [isRailOpen, setIsRailOpen] = useState(false);
+  useEffect(() => setIsRailOpen(false), [pathname]);
   const isAuthRoute = pathname === '/login' || pathname === '/signup';
   const isHomeRoute = pathname === '/';
   const workspaceId = pathname.match(/^\/workspace\/([^/]+)/)?.[1];
@@ -178,17 +181,29 @@ export function AppShell({
 
   return (
     <AuthProvider user={user}>
-      <div className="flex h-dvh flex-col overflow-hidden bg-ground text-ink">
-        <HomeNavbar />
+      <div className="flex h-dvh flex-col overflow-hidden bg-[#f6f7f9] text-[#18181b]">
+        <HomeNavbar onMenu={() => setIsRailOpen(true)} />
         <div className="flex min-h-0 flex-1">
           {!isHomeRoute && (
-          <aside className="hidden h-full w-[266px] shrink-0 flex-col overflow-hidden border-r-2 border-rule bg-ground md:flex">
-            {workspace ? <WorkspaceRail workspace={workspace} workspaces={workspaces} pathname={pathname} /> : <HomeRail workspaces={workspaces} pathname={pathname} />}
-          </aside>
-        )}
-        <div className="flex min-w-0 min-h-0 flex-1 flex-col">
+            <>
+              <aside className={`fixed inset-y-0 left-0 z-50 flex w-[252px] shrink-0 flex-col overflow-hidden bg-[#151519] text-white shadow-2xl transition-transform md:relative md:z-auto md:translate-x-0 md:shadow-none ${isRailOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+                <div className="hidden h-[60px] shrink-0 items-center border-b border-white/[0.06] px-[17px] md:flex">
+                  <span className="grid size-[29px] place-items-center rounded-lg bg-[#5b5bd6] text-white">P</span>
+                  <span className="ml-2.5 text-[15px] font-semibold">PaperMind</span>
+                </div>
+                <div className="flex h-[60px] shrink-0 items-center border-b border-white/[0.06] px-[17px] md:hidden">
+                  <span className="grid size-[29px] place-items-center rounded-lg bg-[#5b5bd6] text-white">P</span>
+                  <span className="ml-2.5 text-[15px] font-semibold">PaperMind</span>
+                  <button type="button" aria-label="Close navigation" onClick={() => setIsRailOpen(false)} className="ml-auto rounded-md p-1 text-[#a7a7b1] hover:bg-white/[0.06]"><IconClose width={18} height={18} /></button>
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto py-3">
+                  {workspace ? <WorkspaceRail workspace={workspace} workspaces={workspaces} pathname={pathname} /> : <HomeRail workspaces={workspaces} pathname={pathname} />}
+                </div>
+              </aside>
+              {isRailOpen && <button type="button" aria-label="Close navigation overlay" onClick={() => setIsRailOpen(false)} className="fixed inset-0 z-40 bg-black/30 md:hidden" />}
+            </>
+          )}
           <main className="min-h-0 min-w-0 flex-1 overflow-auto">{children}</main>
-        </div>
         </div>
       </div>
     </AuthProvider>

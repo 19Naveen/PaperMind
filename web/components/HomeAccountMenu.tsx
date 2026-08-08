@@ -15,7 +15,7 @@ export function HomeAccountMenu() {
       <summary
         aria-label="Open account menu"
         aria-haspopup="menu"
-        className="flex cursor-pointer list-none items-center gap-2 border border-transparent px-1.5 py-1 text-left transition-colors hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        className="flex cursor-pointer list-none items-center gap-2 rounded-lg border border-transparent px-1.5 py-1 text-left transition-colors hover:bg-[#f0f1f4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5b5bd6]"
       >
         <span className="grid size-8 shrink-0 place-items-center rounded-full bg-accent-soft font-data text-[10px] font-bold text-accent">{initialsOf(user.name)}</span>
         <span className="hidden min-w-0 sm:block">
@@ -24,7 +24,7 @@ export function HomeAccountMenu() {
         </span>
         <IconChevronDown width={14} height={14} className="hidden shrink-0 text-ink-3 sm:block" />
       </summary>
-      <div className="absolute right-0 top-[calc(100%+10px)] z-30 w-64 border border-rule bg-surface shadow-lg">
+      <div className="absolute right-0 top-[calc(100%+10px)] z-30 w-64 overflow-hidden rounded-xl border border-[#dedee3] bg-white shadow-lg">
         <div className="flex items-center gap-3 border-b border-rule px-4 py-3.5">
           <span className="grid size-9 shrink-0 place-items-center bg-ink font-data text-[10px] font-bold text-ground">{initialsOf(user.name)}</span>
           <span className="min-w-0">
