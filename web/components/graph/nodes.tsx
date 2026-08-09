@@ -9,6 +9,8 @@ export type GraphNodeData = {
   label: string;
   detail?: string;
   onRename: (id: string, label: string) => void;
+  /** When true the canvas is a read-only preview — labels render as plain text. */
+  readOnly?: boolean;
 };
 
 type GraphNode = Node<GraphNodeData>;
@@ -41,6 +43,7 @@ export function DocTypeNode({ id, data, selected }: NodeProps<GraphNode>) {
         value={data.label}
         onChange={(v) => data.onRename(id, v)}
         className="display mt-1 block text-[13px] leading-tight"
+        readOnly={data.readOnly}
       />
     </div>
   );
@@ -64,6 +67,7 @@ export function FieldNode({ id, data, selected }: NodeProps<GraphNode>) {
         value={data.label}
         onChange={(v) => data.onRename(id, v)}
         className="display mt-1 block text-[13px] leading-tight"
+        readOnly={data.readOnly}
       />
       {data.detail && <p className="stamp mt-1.5 inline-block">{data.detail}</p>}
     </div>
@@ -88,6 +92,7 @@ export function RuleNode({ id, data, selected }: NodeProps<GraphNode>) {
         value={data.label}
         onChange={(v) => data.onRename(id, v)}
         className="display mt-1 block text-[13px] leading-tight"
+        readOnly={data.readOnly}
       />
       {data.detail && (
         <p className="mt-1 truncate text-[12px] text-ink-2" title={data.detail}>

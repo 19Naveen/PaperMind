@@ -3,20 +3,29 @@
 import { useState } from 'react';
 
 /**
- * Double-click a node's label to rename it inline. Shared by all three node
- * kinds — the only thing renaming needs is a controlled span/input swap.
+ * A node's label: plain text when read-only, or an inline rename when editable.
+ * Renaming opens on double-click or Enter/Space (the keyboard path is not
+ * double-click-only), and the field is labelled for screen readers.
  */
 export function EditableLabel({
   value,
   onChange,
   className,
+  readOnly,
 }: {
   value: string;
   onChange: (next: string) => void;
   className?: string;
+  readOnly?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
+
+  function startEdit() {
+    if (readOnly) return;
+    setDraft(value);
+    setEditing(true);
+  }
 
   function commit() {
     setEditing(false);
@@ -25,10 +34,15 @@ export function EditableLabel({
     else setDraft(value);
   }
 
+  if (readOnly) {
+    return <span className={className}>{value}</span>;
+  }
+
   if (editing) {
     return (
       <input
         autoFocus
+        aria-label={`Rename ${value}`}
         className={`nodrag w-full rounded-none border border-accent bg-surface px-1 py-0.5 text-inherit outline-none ${className ?? ''}`}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
@@ -39,6 +53,8 @@ export function EditableLabel({
             setDraft(value);
             setEditing(false);
           }
+          // Space types a space here rather than toggling — stop the default scroll.
+          if (e.key === ' ') e.stopPropagation();
         }}
       />
     );
@@ -46,13 +62,21 @@ export function EditableLabel({
 
   return (
     <span
-      className={className}
+      role="button"
+      tabIndex={0}
+      aria-label={`Rename ${value}`}
+      className={`${className ?? ''} cursor-text`}
       onDoubleClick={(e) => {
         e.stopPropagation();
-        setDraft(value);
-        setEditing(true);
+        startEdit();
       }}
-      title="Double-click to rename"
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          e.stopPropagation();
+          startEdit();
+        }
+      }}
     >
       {value}
     </span>

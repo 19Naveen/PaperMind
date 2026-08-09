@@ -38,14 +38,18 @@ const PLACEHOLDER: Record<NodeKind, string> = {
 
 // Nodes are numbered 01..N in document_type → field → rule order, so the cards
 // can carry the prototype's numbered kicker and the ports/ledger views triangulate.
-function toRFNodes(nodes: FlowNode[], onRename: (id: string, label: string) => void): GNode[] {
+function toRFNodes(
+  nodes: FlowNode[],
+  onRename: (id: string, label: string) => void,
+  readOnly: boolean,
+): GNode[] {
   return [...nodes]
     .sort((a, b) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind])
     .map((n, i) => ({
       id: n.id,
       type: n.kind,
       position: n.position,
-      data: { label: n.label, detail: n.detail, num: String(i + 1).padStart(2, '0'), onRename },
+      data: { label: n.label, detail: n.detail, num: String(i + 1).padStart(2, '0'), onRename, readOnly },
     }));
 }
 
@@ -92,7 +96,7 @@ function Canvas({
   // handler — never during this render. Storing the function itself (not
   // reading `.current`) into node.data is the part happening now.
   // eslint-disable-next-line react-hooks/refs
-  const [rfNodes, setRfNodes] = useNodesState<GNode>(toRFNodes(nodes, onRename));
+  const [rfNodes, setRfNodes] = useNodesState<GNode>(toRFNodes(nodes, onRename, readOnly));
   const [rfEdges, setRfEdges] = useEdgesState<Edge>(toRFEdges(edges));
 
   const rfNodesRef = useRef(rfNodes);
@@ -182,14 +186,14 @@ function Canvas({
           id,
           type: kind,
           position: { x: COL_X[kind], y: 40 + count * 100 },
-          data: { label: PLACEHOLDER[kind], detail: kind === 'field' ? 'string' : undefined, num: '00', onRename },
+          data: { label: PLACEHOLDER[kind], detail: kind === 'field' ? 'string' : undefined, num: '00', onRename, readOnly },
         };
-        const next = toRFNodes(fromRFNodes([...nds, newNode]), onRename);
+        const next = toRFNodes(fromRFNodes([...nds, newNode]), onRename, readOnly);
         emit(next, rfEdgesRef.current);
         return next;
       });
     },
-    [emit, onRename, setRfNodes],
+    [emit, onRename, setRfNodes, readOnly],
   );
 
   // External change (chat patch) landed while we're mounted — resync. Our
@@ -197,10 +201,10 @@ function Canvas({
   // `emit`, so this skips echoes and only fires on real outside edits.
   useEffect(() => {
     if (nodes !== lastEmitted.current.nodes) {
-      setRfNodes(toRFNodes(nodes, onRename));
+      setRfNodes(toRFNodes(nodes, onRename, readOnly));
       lastEmitted.current.nodes = nodes;
     }
-  }, [nodes, onRename, setRfNodes]);
+  }, [nodes, onRename, setRfNodes, readOnly]);
   useEffect(() => {
     if (edges !== lastEmitted.current.edges) {
       setRfEdges(toRFEdges(edges));

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { ChatMessage, Fact, RunOut, RunStatus, WorkspaceSessionOut } from '@/lib/api';
 import { correctFactAction, deleteSessionAction, startRunAction, updateSessionAction, uploadDocumentAction } from '@/lib/session';
+import { readSseStream } from '@/lib/sse';
 import {
   ActionButton,
   Card,
@@ -222,26 +223,12 @@ export function SessionView({ workspaceId, workspaceName, session, run }: Sessio
         body: JSON.stringify({ text: content }),
       });
       if (!res.ok || !res.body) throw new Error('chat request failed');
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const events = buffer.split('\n\n');
-        buffer = events.pop() ?? '';
-        for (const event of events) {
-          for (const line of event.split('\n')) {
-            if (!line.startsWith('data: ')) continue;
-            const payload = JSON.parse(line.slice(6)) as { type: string; text?: string };
-            if (payload.type === 'token' && typeof payload.text === 'string') {
-              replyRef.current += payload.text;
-              setReply(replyRef.current);
-            }
-          }
+      await readSseStream(res.body, (payload) => {
+        if (payload.type === 'token' && typeof payload.text === 'string') {
+          replyRef.current += payload.text;
+          setReply(replyRef.current);
         }
-      }
+      });
     } catch {
       replyRef.current = 'I could not answer that right now. Try again in a moment.';
       setReply(replyRef.current);

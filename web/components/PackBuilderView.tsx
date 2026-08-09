@@ -4,6 +4,7 @@ import { startTransition, useEffect, useMemo, useRef, useState } from 'react';
 import type { PackSpec } from '@/lib/api';
 import { specToGraph } from '@/lib/types';
 import { approveAndInstallAction, createStudioSessionAction } from '@/lib/session';
+import { readSseStream } from '@/lib/sse';
 import { ActionButton, CardKicker, EmptyState, PageHeader, Seg, Tag } from '@/components/ui';
 import { GraphCanvas } from '@/components/GraphCanvas';
 
@@ -74,35 +75,22 @@ export function PackBuilderView({ workspaceId, workspaceName }: { workspaceId: s
         body: JSON.stringify({ sessionId: sid, text: content }),
       });
       if (!res.ok || !res.body) throw new Error('studio request failed');
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
       let assistant = '';
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const events = buffer.split('\n\n');
-        buffer = events.pop() ?? '';
-        for (const event of events) {
-          for (const line of event.split('\n')) {
-            if (!line.startsWith('data: ')) continue;
-            const payload = JSON.parse(line.slice(6)) as { type: string; text?: string; spec?: PackSpec };
-            if (payload.type === 'token' && typeof payload.text === 'string') {
-              assistant += payload.text;
-              setLines((current) => {
-                const next = [...current];
-                next[next.length - 1] = { role: 'assistant', content: assistant };
-                return next;
-              });
-            } else if (payload.type === 'draft_spec' && payload.spec) {
-              draftRef.current = payload.spec;
-              setDraft(payload.spec);
-              setPackName(payload.spec.name || '');
-            }
-          }
+      await readSseStream(res.body, (payload) => {
+        if (payload.type === 'token' && typeof payload.text === 'string') {
+          assistant += payload.text;
+          setLines((current) => {
+            const next = [...current];
+            next[next.length - 1] = { role: 'assistant', content: assistant };
+            return next;
+          });
+        } else if (payload.type === 'draft_spec' && payload.spec) {
+          const spec = payload.spec as PackSpec;
+          draftRef.current = spec;
+          setDraft(spec);
+          setPackName(spec.name || '');
         }
-      }
+      });
       setLines((current) => {
         const next = [...current];
         next[next.length - 1] = { role: 'assistant', content: assistant || 'I could not draft that right now.' };

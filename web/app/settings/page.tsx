@@ -9,7 +9,11 @@ import { changePasswordAction, updateMeAction, type ProfileFailure } from '@/lib
 
 function FieldError({ message }: { message: string | undefined }) {
   if (!message) return null;
-  return <p className="mt-1 text-[11.5px] text-missing">{message}</p>;
+  return (
+    <p role="alert" className="mt-1 text-[11.5px] text-missing">
+      {message}
+    </p>
+  );
 }
 
 function AccountCard() {
@@ -81,7 +85,11 @@ function AccountCard() {
           >
             {busy ? 'Saving…' : 'Save changes'}
           </button>
-          {message && <p className="text-[12px] text-verified">{message}</p>}
+          {message && (
+            <p role="status" className="text-[12px] text-verified">
+              {message}
+            </p>
+          )}
         </div>
       </div>
     </Card>
