@@ -387,11 +387,6 @@ export function EmptyState({
   );
 }
 
-/** The locator stamp — a citation's permanent address. */
-export function Stamp({ children }: { children: React.ReactNode }) {
-  return <span className="stamp">{children}</span>;
-}
-
 // ---------------------------------------------------------------------------
 // Stat block
 // ---------------------------------------------------------------------------

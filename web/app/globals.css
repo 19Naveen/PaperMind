@@ -70,10 +70,6 @@
   --color-running: #3557c7;
   --color-running-soft: #e8edfb;
 
-  /* Transilluminated span in the evidence viewer. */
-  --color-highlight: #ffe8a3;
-  --color-highlight-edge: #d9a53c;
-
   --radius-sm: 0px;
   --radius-md: 0px;
   --radius-lg: 0px;
@@ -143,46 +139,6 @@ body {
   background: var(--color-surface);
 }
 
-/* The cited span, lit up inside its source. */
-.evidence-span {
-  background: var(--color-highlight);
-  box-shadow: inset 2px 0 0 var(--color-highlight-edge);
-  color: var(--color-ink);
-  padding: 1px 0;
-}
-
-@keyframes sweep {
-  from { clip-path: inset(0 100% 0 0); }
-  to { clip-path: inset(0 0 0 0); }
-}
-.sweep {
-  animation: sweep 420ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
-}
-
-/* Keyboard hint chip (⌘K and friends). */
-.kbd {
-  font-family: var(--font-data);
-  font-size: 10px;
-  letter-spacing: 0.02em;
-  color: var(--color-ink-2);
-  border: 1px solid var(--color-rule);
-  border-bottom-width: 2px;
-  border-radius: 0;
-  padding: 0 5px;
-  line-height: 1.6;
-  background: var(--color-raised);
-  white-space: nowrap;
-}
-
-/* A quiet index strip — the readout bar that tells you what the console knows. */
-.readout {
-  font-family: var(--font-data);
-  font-size: 10px;
-  letter-spacing: 0.03em;
-  color: var(--color-ink-3);
-  white-space: nowrap;
-}
-
 :focus-visible {
   outline: none;
 }
@@ -221,9 +177,6 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sweep {
-    animation: none;
-  }
   * {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
