@@ -1,7 +1,7 @@
 'use client';
 
 import { startTransition, useEffect, useMemo, useState } from 'react';
-import { IMPORT_SPEC_KEY, specToGraph, type PackSpec } from '@/lib/types';
+import { IMPORT_SPEC_KEY, type PackSpec } from '@/lib/types';
 import { IconArrowRight, IconBriefcase, IconCheck, IconLayers } from '@/lib/icons';
 import { createWorkspaceAction } from '@/lib/session';
 
@@ -77,7 +77,6 @@ export function NewWorkspaceWizard() {
   function create() {
     // ponytail: the chosen starting Pack (blank/imported/library) has no backend
     // to receive it yet — only the workspace itself (name + goal) is real.
-    if (importedSpec) void specToGraph(importedSpec);
     const goal = objective === 'custom' ? 'No Pack installed yet.' : (OBJECTIVES.find((o) => o.id === objective)?.blurb ?? '');
     setCreating(true);
     setError(null);

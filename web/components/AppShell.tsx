@@ -179,6 +179,7 @@ export function AppShell({
   return (
     <AuthProvider user={user}>
       <div className="flex h-dvh flex-col overflow-hidden bg-ground text-ink">
+        <a href="#main" className="skip-link">Skip to content</a>
         <HomeNavbar />
         <div className="flex min-h-0 flex-1">
           {!isHomeRoute && (
@@ -187,7 +188,7 @@ export function AppShell({
           </aside>
         )}
         <div className="flex min-w-0 min-h-0 flex-1 flex-col">
-          <main className="min-h-0 min-w-0 flex-1 overflow-auto">{children}</main>
+          <main id="main" className="min-h-0 min-w-0 flex-1 overflow-auto">{children}</main>
         </div>
         </div>
       </div>

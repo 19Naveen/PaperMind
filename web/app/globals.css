@@ -21,7 +21,9 @@
   --color-inset: #e7e4e4;
   --color-ink: #201e1d;
   --color-ink-2: #615d5d;
-  --color-ink-3: #9b9797;
+  /* ink-3 is used for 10px eyebrows, readouts and meta text — darkened from
+     #9b9797 (2.4–2.7:1, failed WCAG AA) to hold ≥4.5:1 on every surface. */
+  --color-ink-3: #6b6666;
   --color-rule: #a5a09f;
   --color-rule-2: #cdc9c8;
 
@@ -37,7 +39,9 @@
   --color-neutral-900: #2d2b2b;
 
   /* Brand / actions */
-  --color-accent: #ec3013;
+  /* accent darkened from #ec3013 (3.8–4.2:1, failed AA) to #d22a11 so it reads
+     as small text on paper AND as a button fill under accent-ink text. */
+  --color-accent: #d22a11;
   --color-accent-ink: #f3f2f2;
   --color-accent-soft: #fff2ef;
   --color-accent-2: #e15b47;
@@ -48,7 +52,8 @@
   --color-accent-300: #ffc4b8;
   --color-accent-400: #ff9783;
   --color-accent-500: #ff563c;
-  --color-accent-600: #dd2b0f;
+  /* Hover state — must stay darker than the new base accent, not lighter. */
+  --color-accent-600: #b6230d;
   --color-accent-700: #ae1800;
   --color-accent-800: #7c1405;
   --color-accent-900: #4d170e;
@@ -85,8 +90,28 @@ body {
   font-family: var(--font-sans);
   font-size: 15px;
   line-height: 1.55;
+  /* The palette is fixed light paper — tell native controls/scrollbars so they
+     render consistently instead of following the OS theme. */
+  color-scheme: light;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+/* Keyboard skip link — off-screen until focused, then pinned to the top-left. */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+  padding: 10px 16px;
+  background: var(--color-ink);
+  color: var(--color-ground);
+  font: 600 13px var(--font-sans);
+}
+.skip-link:focus {
+  left: 0;
+  outline: 2px solid var(--color-focus);
+  outline-offset: 0;
 }
 
 /* Display face runs tight bold like the prototype headlines. */

@@ -97,19 +97,26 @@ function FactRow({ fact, runId, workspaceId }: { fact: Fact; runId: string; work
           <input
             value={value}
             onChange={(e) => setValue(e.target.value)}
+            aria-label={`Corrected value for ${fact.field}`}
             placeholder="Your corrected value"
             className="min-w-0 flex-1 border border-rule bg-surface px-2.5 py-1.5 text-[12px] text-ink outline-none placeholder:text-ink-3 focus:border-accent"
           />
           <input
             value={note}
             onChange={(e) => setNote(e.target.value)}
+            aria-label="Optional note for the correction"
             placeholder="Note (optional)"
             className="w-40 border border-rule bg-surface px-2.5 py-1.5 text-[12px] text-ink outline-none placeholder:text-ink-3 focus:border-accent"
           />
           <ActionButton size="sm" variant={saved ? 'secondary' : 'primary'} onClick={submit} disabled={saving || saved}>
-            {saved ? 'Saved' : 'Correct'}
+            {saved ? 'Recorded' : 'Propose correction'}
           </ActionButton>
         </div>
+      )}
+      {saved && (
+        <p className="mt-1.5 text-[11.5px] text-ink-3" role="status">
+          Correction recorded — it applies on the next run.
+        </p>
       )}
     </div>
   );
@@ -137,7 +144,20 @@ export function SessionView({ workspaceId, workspaceName, session, run }: Sessio
   const [title, setTitle] = useState(session.title);
   const [isRenaming, setIsRenaming] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [chatDone, setChatDone] = useState(false);
   const replyRef = useRef('');
+  const deleteDialogRef = useRef<HTMLElement>(null);
+  const deleteCancelRef = useRef<HTMLButtonElement>(null);
+  const deleteTriggerRef = useRef<HTMLButtonElement>(null);
+
+  // Move focus into the delete dialog and return it to the Delete trigger on
+  // close — a confirmation is a trap, not a tab-stop.
+  useEffect(() => {
+    if (!isDeleteOpen) return;
+    deleteCancelRef.current?.focus();
+    const trigger = deleteTriggerRef.current;
+    return () => trigger?.focus();
+  }, [isDeleteOpen]);
 
   const status: RunStatus =
     liveRun?.status ?? (liveSession.status === 'complete' ? 'complete' : 'pending');
@@ -145,20 +165,45 @@ export function SessionView({ workspaceId, workspaceName, session, run }: Sessio
 
   // Poll the run route while the engine works (CLAUDE.md §4.2 wants TanStack Query for
   // this; it is not installed, so the poll goes through a route handler instead).
+  // Backs off 2s → 8s as the run drags on, skips requests while the tab is hidden,
+  // and refetches immediately when it becomes visible again.
   useEffect(() => {
     if (!running) return;
-    const timer = setInterval(async () => {
-      try {
-        const res = await fetch(`/workspace/${workspaceId}/sessions/${session.id}/run`);
-        if (!res.ok) return;
-        const body = (await res.json()) as { session: WorkspaceSessionOut | null; run: RunOut | null };
-        if (body.session) setLiveSession(body.session);
-        if (body.run) setLiveRun(body.run);
-      } catch {
-        // transient poll failure — the next tick retries
+    let delay = 2000;
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    async function tick() {
+      if (stopped) return;
+      if (document.visibilityState !== 'hidden') {
+        try {
+          const res = await fetch(`/workspace/${workspaceId}/sessions/${session.id}/run`);
+          if (!res.ok) return;
+          const body = (await res.json()) as { session: WorkspaceSessionOut | null; run: RunOut | null };
+          if (body.session) setLiveSession(body.session);
+          if (body.run) setLiveRun(body.run);
+        } catch {
+          // transient poll failure — the next tick retries
+        }
       }
-    }, 2000);
-    return () => clearInterval(timer);
+      delay = Math.min(delay * 1.5, 8000);
+      if (document.visibilityState === 'hidden') delay = Math.max(delay, 8000);
+      timer = setTimeout(tick, delay);
+    }
+
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible' || stopped) return;
+      if (timer) clearTimeout(timer);
+      delay = 2000;
+      void tick();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    void tick();
+    return () => {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [workspaceId, session.id, running]);
 
   async function send(text: string) {
@@ -167,6 +212,7 @@ export function SessionView({ workspaceId, workspaceName, session, run }: Sessio
     setMessages((current) => [...current, { role: 'user', content }]);
     setInput('');
     setStreaming(true);
+    setChatDone(false);
     setReply('');
     replyRef.current = '';
     try {
@@ -201,6 +247,7 @@ export function SessionView({ workspaceId, workspaceName, session, run }: Sessio
       setReply(replyRef.current);
     }
     setStreaming(false);
+    setChatDone(true);
     setMessages((current) => [...current, { role: 'assistant', content: replyRef.current }]);
     router.refresh();
   }
@@ -250,8 +297,7 @@ export function SessionView({ workspaceId, workspaceName, session, run }: Sessio
           <>
             <Tag variant="neutral">{liveRun ? `Pack ${liveRun.pack_name} v${liveRun.pack_version}` : 'Pack pending'}</Tag>
             <ActionButton size="sm" variant="secondary" onClick={() => setIsRenaming((value) => !value)}>{isRenaming ? 'Cancel' : 'Rename'}</ActionButton>
-            <ActionButton size="sm" variant="danger" onClick={() => setIsDeleteOpen(true)}>Delete</ActionButton>
-            <ActionButton size="sm" variant="primary" onClick={() => void start()} disabled={starting || running || uploaded.length === 0}>{starting ? 'Starting…' : liveRun ? 'Run again' : 'Start run'}</ActionButton>
+            <ActionButton ref={deleteTriggerRef} size="sm" variant="danger" onClick={() => setIsDeleteOpen(true)}>Delete</ActionButton>
           </>
         }
       />
@@ -273,6 +319,7 @@ export function SessionView({ workspaceId, workspaceName, session, run }: Sessio
                     setSubject(e.target.value);
                     setSubjectDirty(true);
                   }}
+                  aria-label="Session subject"
                   placeholder="What is this session reviewing?"
                   className="min-w-0 flex-1 border border-rule bg-raised px-2.5 py-1.5 text-[13px] text-ink outline-none placeholder:text-ink-3 focus:border-accent"
                 />
@@ -284,6 +331,7 @@ export function SessionView({ workspaceId, workspaceName, session, run }: Sessio
 
             <section className="border-b border-rule py-4">
               <p className="eyebrow">Uploaded files</p>
+              <div aria-live="polite">
               {uploaded.length > 0 ? (
                 <div className="mt-2 space-y-2">
                   {uploaded.map((file) => (
@@ -296,6 +344,7 @@ export function SessionView({ workspaceId, workspaceName, session, run }: Sessio
               ) : (
                 <p className="mt-2 text-[12px] text-ink-2">No documents uploaded.</p>
               )}
+              </div>
               <form action={onUpload} className="mt-2 flex gap-2">
                 <label className="flex min-w-0 flex-1 cursor-pointer items-center justify-center gap-1.5 border border-dashed border-rule px-2 py-1.5 text-[12px] text-ink-2 transition-colors hover:border-accent hover:text-ink">
                   Upload PDF or text
@@ -320,7 +369,7 @@ export function SessionView({ workspaceId, workspaceName, session, run }: Sessio
               </section>
             )}
 
-            <section>
+            <section aria-busy={streaming}>
               {renderedMessages.map((message, index) => (
                 <article key={index} className={`border-b border-rule py-4 ${message.role === 'user' ? 'text-right' : ''}`}>
                   <p className={`eyebrow ${message.role === 'assistant' ? 'text-accent' : ''}`}>
@@ -329,6 +378,9 @@ export function SessionView({ workspaceId, workspaceName, session, run }: Sessio
                   <p className="mt-1 whitespace-pre-line text-[13px] leading-relaxed text-ink-2">{message.content}</p>
                 </article>
               ))}
+              <span className="sr-only" role="status">
+                {streaming ? 'PaperMind is working…' : chatDone ? 'PaperMind finished responding.' : ''}
+              </span>
             </section>
           </div>
           <form
@@ -341,6 +393,7 @@ export function SessionView({ workspaceId, workspaceName, session, run }: Sessio
             <textarea
               value={input}
               onChange={(event) => setInput(event.target.value)}
+              aria-label="Message PaperMind"
               placeholder="Ask about this session…"
               className="min-h-[68px] w-full resize-none border border-rule bg-raised p-2.5 text-[13px] outline-none focus:border-accent"
             />
@@ -427,12 +480,36 @@ export function SessionView({ workspaceId, workspaceName, session, run }: Sessio
       </div>
       {isDeleteOpen && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-ink/45 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) setIsDeleteOpen(false); }}>
-          <section role="alertdialog" aria-modal="true" aria-labelledby="delete-session-title" aria-describedby="delete-session-copy" className="w-full max-w-md border-2 border-rule bg-ground p-5 shadow-lg" onKeyDown={(event) => { if (event.key === 'Escape') setIsDeleteOpen(false); }}>
+          <section
+            ref={deleteDialogRef}
+            tabIndex={-1}
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-session-title"
+            aria-describedby="delete-session-copy"
+            className="w-full max-w-md border-2 border-rule bg-ground p-5 shadow-lg"
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') setIsDeleteOpen(false);
+              if (event.key === 'Tab' && deleteDialogRef.current) {
+                const buttons = deleteDialogRef.current.querySelectorAll<HTMLButtonElement>('button');
+                if (buttons.length === 0) return;
+                const first = buttons[0];
+                const last = buttons[buttons.length - 1];
+                if (event.shiftKey && document.activeElement === first) {
+                  event.preventDefault();
+                  last.focus();
+                } else if (!event.shiftKey && document.activeElement === last) {
+                  event.preventDefault();
+                  first.focus();
+                }
+              }
+            }}
+          >
             <p className="eyebrow text-missing">Destructive action</p>
             <h2 id="delete-session-title" className="display mt-1 text-[21px]">Delete this session?</h2>
             <p id="delete-session-copy" className="mt-3 text-[13px] leading-relaxed text-ink-2">This removes “{title}” and its workspace history. This cannot be undone.</p>
             <div className="mt-5 flex justify-end gap-2">
-              <ActionButton variant="secondary" onClick={() => setIsDeleteOpen(false)}>Cancel</ActionButton>
+              <ActionButton ref={deleteCancelRef} variant="secondary" onClick={() => setIsDeleteOpen(false)}>Cancel</ActionButton>
               <ActionButton variant="danger" onClick={() => void deleteSessionAction(workspaceId, session.id)}>Delete session</ActionButton>
             </div>
           </section>

@@ -65,21 +65,10 @@ export interface DocumentContent {
   pages: { page: number; char_start: number }[];
 }
 
-export interface PackField {
-  name: string;
-  description: string;
-  type: string;
-}
-export interface PackRule {
-  id: string;
-  description: string;
-}
-export interface PackSpec {
-  name: string;
-  document_types: string[];
-  fields: PackField[];
-  rules: PackRule[];
-}
+// The Pack spec is the API's contract type (lib/api.ts); re-export it here so
+// authoring code reads from the same shape the backend validates against.
+import type { PackSpec } from '@/lib/api';
+export type { PackSpec };
 export interface PackVersion {
   id: string;
   version: number;
@@ -266,7 +255,7 @@ const ROW_H = 84;
 /**
  * The spec, laid out as a graph. Document types feed the fields extracted
  * from them; a rule wires to a field only when the rule's own text names it —
- * a real, derivable dependency rather than an invented one, since PackField
+ * a real, derivable dependency rather than an invented one, since the PackSpec
  * doesn't declare a source document type or a rule->field reference today.
  */
 export function specToGraph(spec: PackSpec): { nodes: FlowNode[]; edges: FlowEdge[] } {

@@ -141,9 +141,9 @@ export function PackBuilderView({ workspaceId, workspaceName }: { workspaceId: s
           <>
             <Seg
               options={[
-                { value: 'diagram', label: 'Diagram' },
-                { value: 'ports', label: 'Ports' },
-                { value: 'ledger', label: 'Ledger' },
+                { value: 'diagram', label: 'Workflow' },
+                { value: 'ports', label: 'Reads & writes' },
+                { value: 'ledger', label: 'Steps' },
               ]}
               value={view}
               onChange={setView}
@@ -192,6 +192,7 @@ export function PackBuilderView({ workspaceId, workspaceName }: { workspaceId: s
             <textarea
               value={input}
               onChange={(event) => setInput(event.target.value)}
+              aria-label="Describe the review workflow"
               placeholder="e.g. Review supplier invoices: extract the invoice number, vendor name, amount, and payment terms, and verify each against the source document."
               className="min-h-[84px] w-full resize-none border border-rule bg-raised p-2.5 text-[13px] outline-none focus:border-accent"
             />
@@ -213,7 +214,7 @@ export function PackBuilderView({ workspaceId, workspaceName }: { workspaceId: s
           )}
           {view === 'ports' && (
             <div className="overflow-auto p-6">
-              <p className="eyebrow mb-4">Data ports · what each step reads and writes</p>
+              <p className="eyebrow mb-4">What each step reads and writes</p>
               <div className="grid border-l border-t-2 border-rule sm:grid-cols-2 xl:grid-cols-3">
                 {graph.nodes.map((node, index) => (
                   <article key={node.id} className="border-b border-r border-rule bg-ground p-4">
@@ -227,7 +228,7 @@ export function PackBuilderView({ workspaceId, workspaceName }: { workspaceId: s
           )}
           {view === 'ledger' && (
             <div className="overflow-auto p-6">
-              <p className="eyebrow mb-4">Ledger · execution order</p>
+              <p className="eyebrow mb-4">Execution order</p>
               <ol className="border-t-2 border-rule">
                 {graph.nodes.map((node, index) => (
                   <li key={node.id} className="grid grid-cols-[56px_1fr] gap-4 border-b border-rule py-4">

@@ -153,6 +153,7 @@ export function ActionButton({
   type = 'button',
   icon,
   className = '',
+  ref,
 }: {
   children: ReactNode;
   variant?: ButtonVariant;
@@ -162,9 +163,12 @@ export function ActionButton({
   type?: 'button' | 'submit';
   icon?: ReactNode;
   className?: string;
+  /** React 19 ref-as-prop — used by dialogs to focus/restore focus. */
+  ref?: React.Ref<HTMLButtonElement>;
 }) {
   return (
     <button
+      ref={ref}
       type={type}
       onClick={onClick}
       disabled={disabled}

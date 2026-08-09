@@ -12,6 +12,7 @@
  */
 
 import { cookies } from 'next/headers';
+import { cache } from 'react';
 
 const BASE_URL = process.env.PAPERMIND_API_URL ?? 'http://localhost:8000';
 
@@ -286,24 +287,26 @@ export function logout(): Promise<unknown> {
 }
 
 /** The signed-in user, or `null` when the session cookie is absent or stale. */
-export async function getMe(): Promise<User | null> {
+export const getMe = cache(async (): Promise<User | null> => {
   try {
     return await apiFetch<User>('/auth/me');
   } catch (error) {
     if (error instanceof ApiError && error.code === 'NOT_AUTHENTICATED') return null;
     throw error;
   }
-}
+});
 
 // ----------------------------------------------------------------- workspaces
 
-export function listWorkspaces(limit = 50, offset = 0): Promise<WorkspaceOut[]> {
+// The layout and the home page both resolve the same user/workspace list in one
+// render pass — React cache() collapses the duplicate into a single fetch.
+export const listWorkspaces = cache((limit = 50, offset = 0): Promise<WorkspaceOut[]> => {
   return apiFetch<WorkspaceOut[]>(`/workspaces?limit=${limit}&offset=${offset}`);
-}
+});
 
-export function getWorkspace(id: string): Promise<WorkspaceDetailOut> {
+export const getWorkspace = cache((id: string): Promise<WorkspaceDetailOut> => {
   return apiFetch<WorkspaceDetailOut>(`/workspaces/${id}`);
-}
+});
 
 export function createWorkspace(name: string, goal: string): Promise<WorkspaceOut> {
   return apiFetch<WorkspaceOut>('/workspaces', { method: 'POST', body: JSON.stringify({ name, goal }) });
