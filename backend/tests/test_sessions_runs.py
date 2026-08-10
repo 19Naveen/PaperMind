@@ -13,10 +13,10 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.api.v1.routers.auth import router as auth_router
-from app.api.v1.routers.packs import router as packs_router
-from app.api.v1.routers.runs import router as runs_router
-from app.api.v1.routers.workspaces import router as workspaces_router
+from app.api.routers.auth import router as auth_router
+from app.api.routers.packs import router as packs_router
+from app.api.routers.runs import router as runs_router
+from app.api.routers.workspaces import router as workspaces_router
 from app.core.errors import install_error_handlers
 
 
@@ -56,7 +56,16 @@ def make_pack_with_version(client: TestClient) -> dict[str, object]:
         ],
         "rules": [{"id": "r1", "description": "name must match"}],
     }
-    v = client.post(f"/packs/{pack['id']}/versions", json={"spec": spec})
+    # Direct spec submission is governance-rejected; freeze a Studio draft instead.
+    from app.core.db import SessionLocal
+    from tests.util import make_draft_session
+
+    db = SessionLocal()
+    try:
+        sid = str(make_draft_session(db, spec, title="KYC draft"))
+    finally:
+        db.close()
+    v = client.post(f"/packs/{pack['id']}/versions", json={"draft_session_id": sid})
     assert v.status_code == 201, v.text
     return pack
 

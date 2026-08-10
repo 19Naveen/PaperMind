@@ -10,7 +10,7 @@ from fastapi import APIRouter, File, UploadFile
 from sqlalchemy.orm import Session
 
 import app.schemas as s
-from app.core.db import DB
+from app.api.deps import DB
 from app.core.errors import ApiError, Code
 from app.models import Document
 from app.services.ingest import store_document

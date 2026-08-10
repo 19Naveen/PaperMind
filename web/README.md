@@ -2,7 +2,7 @@
 
 The reviewer's console for PaperMind: author a **Pack** once, then run it against document sets from isolated **Sessions**. This package is the Next.js App Router frontend.
 
-> **Status: wired to the FastAPI backend.** Pages read from the service through `lib/api.ts` (server-only) and auth is real (httpOnly cookie, Server Actions). The only remaining fixtures are static **Marketplace** reference metadata in `lib/mock.ts` (`MARKETPLACE_PACKS`), used to enrich real pack cards. See [Known gaps](#known-gaps).
+> **Status: wired to the FastAPI backend.** Pages read from the service through `lib/api.ts` (server-only) and auth is real (httpOnly cookie, Server Actions). Marketplace cards are driven by real backend data (install counts, latest-version document/field/rule summaries); `lib/mock.ts` holds only a small static catalogue-copy seed (`MARKETPLACE_PACKS`) for display blurb. See [Known gaps](#known-gaps).
 
 ---
 
@@ -67,10 +67,12 @@ Sign in with the demo account (`ada@papermind.io` / `papermind123`) after seedin
 | Route | Screen | Component |
 |---|---|---|
 | `/` | Home — workspace grid, aggregate stats, recent-activity ledger | `app/page.tsx` + `WorkspaceBrowser` |
-| `/marketplace` | Published Packs, search + category filters, install picker | `app/marketplace/page.tsx` + `MarketGrid` |
-| `/workspace/new` | New-workspace wizard (objective → start-from → open) | `NewWorkspaceWizard` |
+| `/marketplace` | Published Packs — searchable grid; each card opens the pack detail | `app/marketplace/page.tsx` + `MarketGrid` |
+| `/marketplace/[packId]` | Pack detail — documents/fields/rules/version history + install into a workspace | `app/marketplace/[packId]/page.tsx` + `MarketplaceInstall` |
+| `/marketplace/[packId]/edit` | Edit a published Pack — Studio that approves a new version | `app/marketplace/[packId]/edit/page.tsx` + `PackBuilderView` |
+| `/workspace/new` | New-workspace wizard (objective → start-from → open); a chosen Pack installs on create | `NewWorkspaceWizard` |
 | `/workspace/[id]` | Workspace overview — installed Pack, assets, stat strip, sessions | `WorkspaceView` |
-| `/workspace/[id]/pack` | Pack Studio — conversation, Draft→Publish gate; or read-only installed Pack | `PackBuilderView` |
+| `/workspace/[id]/pack` | Pack Studio (author → Publish, or Edit → Approve new version); read-only when a Pack is installed | `PackBuilderView` |
 | `/workspace/[id]/sessions/[sessionId]` | Session — upload, SSE chat, stage timeline, facts + corrections | `SessionView` |
 | `/login`, `/signup` | Real auth against the backend | `LoginScreen`, `SignupScreen` |
 | `/profile` | Account identity, role, API access, real activity stats | `app/profile/page.tsx` + `ProfileStats` |
@@ -78,7 +80,7 @@ Sign in with the demo account (`ada@papermind.io` / `papermind123`) after seedin
 
 **Route handlers (proxy the browser → FastAPI, keeping the cookie server-side):**
 
-- `…/pack/chat` and `…/sessions/[sessionId]/chat` — SSE proxies for the streaming studio/session chat.
+- `…/pack/chat` (workspace authoring), `…/marketplace/[packId]/edit/chat` (published-Pack editing), and `…/sessions/[sessionId]/chat` — SSE proxies for the streaming studio/session chat. (The two studio proxies are slated to consolidate into one shared handler as part of the engine work.)
 - `…/sessions/[sessionId]/run` — the 2s poll endpoint while a run is in flight.
 
 **Guards:** `app/workspace/layout.tsx` redirects signed-out visitors to `/login`. The root `layout.tsx` resolves the user + workspace list and supplies the `AppShell`. `app/error.tsx`, `app/loading.tsx` (skeleton), and `app/not-found.tsx` are the shared load/error/404 primitives.
@@ -118,38 +120,11 @@ lib/
 
 ---
 
-## Design system — "Modernist"
+## Design system — Premium2.0
 
-Ported from the canonical prototype `Reference/PaperMind.dc.html` at the repository root — that file is the single visual/positional source of truth and governs new frontend work. Flat and architectural: a warm paper ground, ink hairline rules, one display face, and a single red accent reserved for action and state.
+The effective cascade at `../papermind-single.html:624-979` is the visual source of truth: a cool `#f6f7f9` ground, indigo `#5b5bd6` active state, `#151519` sidebar, 60px frosted topbar, Inter display/body, JetBrains Mono metadata, 8px controls, and 12px cards.
 
-**Non-negotiables:**
-
-- **Zero border radius.** `--radius-*` is `0px` on purpose. Do not round a corner.
-- **Accent is not decoration.** `--color-accent` (#ec3013) marks the *one* primary action per screen, active nav state, and eyebrows. Everything else is ink on ground.
-- **2px rules divide sections, 1px rules divide rows.** Alignment and rule weight do the organising — not shadows, not whitespace alone.
-- **Stat strips are flush modular grids** — shared top rule, per-cell bottom rule — not boxed cards.
-- **Light theme only.** The canonical palette is light; the previous auto-dark ramp was removed per the revamp spec. Dark mode, if ever added, must be explicit, complete, and separately reviewed.
-
-### Use the primitives
-
-Everything visual comes from `components/ui.tsx`. **Never hand-roll a `<header>`, `<button>`, or card with literal `px`/color classes** — that is precisely how the earlier screens drifted from the prototype and had to be rewritten.
-
-| Primitive | Use for |
-|---|---|
-| `PageHeader` | Every screen header (eyebrow + title + actions). Owns its own padding. |
-| `Button` (link) / `ActionButton` (handler) | Actions. `primary` = accent fill, one per screen; `secondary`/`outline`/`ghost`/`danger` for the rest. |
-| `Card`, `CardKicker`, `CardTitle`, `CardBody`, `CardMeta` | Content cards (flat paper, no border). |
-| `Panel`, `CardHeader` | Titled sections with an optional right-aligned action. |
-| `Tag` | Small chips — `accent`, `neutral`, `outline`. |
-| `Pill`, `StateBadge` | Operational status / fact state. Both pair color with a glyph or dot — color is never the only signal. |
-| `Seg` | Segmented control (e.g. Diagram · Ports · Ledger). |
-| `Stat`, `Kv`, `Chip`, `Stamp` | Data readouts and the bates-style locator stamp. |
-| `EmptyState` | Every list needs a designed empty state that invites an action. |
-| `Th`, `Td`, `Divider`, `Progress`, `Avatar` | Tables and chrome. |
-
-Tokens live in `app/globals.css` under `@theme`: surfaces (`ground`, `surface`, `raised`, `inset`), ink (`ink`, `ink-2`, `ink-3`), rules (`rule`, `rule-2`), `accent` + a 100–900 ramp plus `accent-ink`/`accent-soft`, a warm `neutral` ramp, and fact/operation states (`verified`, `unsupported`, `missing`, `running`), plus `focus` and `highlight`. Global utility classes: `.display`, `.eyebrow`, `.stamp`, `.kbd`, `.readout`, `.evidence-span`, `.sweep`.
-
-Take colors and fonts from the tokens (`text-ink-2`, `bg-surface`, `border-rule`, `font-data`) — never hard-code a hex or a font name.
+**Use the primitives:** `components/ui.tsx` owns `PageHeader`, `Button`/`ActionButton`, `Card`, `Panel`, `Tag`, `Pill`, `Seg`, `Stat`, `Input`, and `EmptyState`. Pages must reuse those APIs instead of hand-rolling controls or surfaces. Tokens live in `app/globals.css`; use semantic token utilities, never literal colors or fonts.
 
 ### Accessibility floor
 
@@ -174,8 +149,13 @@ Active voice, sentence case, user vocabulary — "Save changes", not "Submit". A
 
 ## Known gaps
 
-- **Marketplace display metadata is static.** `lib/mock.ts` contributes `MARKETPLACE_PACKS` (category, description, node/asset counts, installs, author) so the grid can present cards, keyed to real Packs by name/id. There is no backend field for these yet; cards would render bare with fewer attributes if the list grows beyond those names.
+- **Marketplace copy is still display-only seed.** Cards render real backend data (install count, latest version's documents/fields/rules), but `lib/mock.ts` still holds a small `MARKETPLACE_PACKS` blurb seed (category, description). A backend metadata field replaces it when catalogue copy needs to be editable.
 - **No span-level evidence viewer yet.** `SessionView` renders each fact's citations as quoted blockquote text (`lib/api.ts` `Citation` carries `char_start`/`char_end`/`page`, and `globals.css` has the `.evidence-span`/`.highlight` tokens), but nothing highlights the span in the source document yet.
-- **Chat transcripts are not replayed.** The Pack Studio keeps its draft across reloads (session id in `sessionStorage`), but the conversation history and the run/SSE streams are not re-scripted on reload.
+- **Chat transcripts are not replayed.** The Pack Studio keeps its draft across reloads (session id in `sessionStorage`), but the conversation history and the run/SSE streams are not re-scripted on reload. The enterprise engine's persistent Studio revisions will make the full transcript + draft authoritative on the server.
 - **Notification preferences are browser-local.** `/settings` persists them to `localStorage`; account + password are real API calls.
-- **Orphaned components.** `ChatPane.tsx` and `ImportPackButton.tsx` are unreferenced — the live Pack Studio (`PackBuilderView`) has its own inline chat and `GraphCanvas`. Delete or re-wire before shipping.
+
+## Tests & guards
+
+- **Lint guard.** `npm run lint` runs ESLint **and** `scripts/ui-guard.mjs`, a small drift guard that fails on `rounded-full` outside `components/ui.tsx`, local `Stat`/`GridStat` definitions, and hand-rolled `bg-accent` buttons — the patterns that caused the earlier design-system regression.
+- **Type/build gates.** `npx tsc --noEmit` and `npx next build` must pass (type errors are build failures).
+- **E2E.** Playwright is wired (`playwright.config.ts`, chromium-only, reuses a running dev server); `npm run test:e2e` runs `e2e/*.spec.ts`. Coverage expands as the engine work lands.

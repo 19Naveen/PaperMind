@@ -16,10 +16,10 @@ from typing import cast
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from app.services.llm import JSON_SCHEMA, get_providers
 from app.models import Case, Chunk, Citation, Fact, Run, RunDocument
-from app.services.retrieval import search
 from app.schemas import PackSpec
+from app.services.llm import JSON_SCHEMA, get_providers
+from app.services.retrieval import search
 
 STAGES = ("classify", "retrieve", "extract", "verify", "cross-validate", "report")
 
@@ -47,8 +47,12 @@ def _classify_schema(document_types: list[str]) -> dict[str, object]:
 
 # --- Entry point -------------------------------------------------------------
 def execute_run(run_id: uuid.UUID) -> dict[str, object]:
-    """Run the six stages in fixed order. One function call per stage; no alternate
-    paths. Runs in a FastAPI BackgroundTask; the client polls GET /runs/{id}."""
+    """Execute a run through the DAG executor in a FastAPI BackgroundTask; the client
+    polls GET /runs/{id}. The canonical WorkflowSpecV1 is derived from the frozen pack
+    version (adapting a legacy PackSpec shape) and executed by workflow_runtime, which
+    reuses the deterministic primitives below. `run.report` keeps the legacy summary
+    shape this module always produced."""
+    import app.services.workflow_runtime as wf
     from app.core.db import SessionLocal
 
     db = SessionLocal()
@@ -56,24 +60,32 @@ def execute_run(run_id: uuid.UUID) -> dict[str, object]:
         run = db.get(Run, run_id)
         if run is None:
             return {"status": "failed", "error": "run not found"}
-        spec = PackSpec.model_validate(run.pack_version.spec)
         run.status = "running"
         run.stage = "classify"
         db.commit()
 
         try:
-            _classify(db, run, spec)
-            for case in run.cases:
-                extract_and_verify_case(db, run, case, spec)
-            _cross_validate(db, run, spec)
-            run.stage = "report"
-            run.report = _report(db, run, spec)
-            run.status = "complete"
+            # Validate/adapt first so a malformed frozen spec fails here, then let the
+            # executor re-prepare (it compiles the same plan internally).
+            wf.prepare_workflow(run.pack_version.spec)
+            result = wf.execute_workflow(db, run, run.pack_version.spec)
+            if result["status"] == "complete":
+                run.report = _report(db, run)
+                run.status = "complete"
+                run.stage = None
+            else:
+                run.status = "failed"
+                run.error = wf.sanitize_error(result.get("error") or "execution failed")
+                run.stage = None
+        except wf.WorkflowRunError as exc:
+            db.rollback()
+            run.status = "failed"
+            run.error = wf.sanitize_error(exc)
             run.stage = None
         except Exception as exc:
             db.rollback()
             run.status = "failed"
-            run.error = str(exc)
+            run.error = wf.sanitize_error(exc)
             run.stage = None
         finally:
             run.updated_at = datetime.now()
@@ -373,7 +385,7 @@ def _evaluate_rule(rule: dict[str, object], by_field: dict[str, Fact], doc_types
 
 
 # --- Stage 6: report ----------------------------------------------------------
-def _report(db: Session, run: Run, spec: PackSpec) -> dict[str, object]:
+def _report(db: Session, run: Run, spec: PackSpec | None = None) -> dict[str, object]:
     facts = db.query(Fact).filter(Fact.run_id == run.id).all()
     counts = {"verified": 0, "unsupported": 0, "missing": 0}
     per_case: dict[str, dict[str, int]] = {}

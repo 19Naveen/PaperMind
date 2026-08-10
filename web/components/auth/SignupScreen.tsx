@@ -4,12 +4,12 @@ import { startTransition, useActionState, useState } from 'react';
 import Link from 'next/link';
 import type { FormEvent } from 'react';
 import { signUpAction } from '@/lib/session';
+import type { AuthFailure } from '@/lib/session';
 import { AuthFrame } from './AuthFrame';
 import { Field } from './AuthField';
+import { ActionButton } from '@/components/ui';
 import { IconAlert, IconArrowRight } from '@/lib/icons';
-import type { AuthFailure } from '@/lib/session';
 
-/** Branch on the API's error `code`, never its message (CLAUDE.md §3.4 / §4.4). */
 function errorMessage(failure: AuthFailure | null): string | null {
   if (!failure) return null;
   switch (failure.code) {
@@ -38,23 +38,10 @@ export function SignupScreen() {
     if (busy) return;
     const trimmedName = name.trim();
     const trimmedEmail = email.trim();
-    if (!trimmedName) {
-      setLocalError('Name is required.');
-      return;
-    }
-    if (!trimmedEmail.includes('@')) {
-      setLocalError('Enter a valid email address.');
-      return;
-    }
-    if (password.length < 8) {
-      setLocalError('Password must be at least 8 characters.');
-      return;
-    }
-    if (password !== confirm) {
-      // Confirmation is a client-only concern — the API never sees it.
-      setLocalError('Passwords do not match.');
-      return;
-    }
+    if (!trimmedName) return setLocalError('Name is required.');
+    if (!trimmedEmail.includes('@')) return setLocalError('Enter a valid email address.');
+    if (password.length < 8) return setLocalError('Password must be at least 8 characters.');
+    if (password !== confirm) return setLocalError('Passwords do not match.');
     setLocalError(null);
     startTransition(() => submit({ name: trimmedName, email: trimmedEmail, password }));
   }
@@ -62,63 +49,26 @@ export function SignupScreen() {
   const error = localError ?? errorMessage(failure);
 
   return (
-    <AuthFrame eyebrow="Self-registration · draft" pitch="A reviewer identity. Every result cites its source.">
-      <p className="eyebrow">Account · Draft</p>
-      <h1 className="display mt-1 text-[24px] leading-tight text-ink">Create your account</h1>
-      <p className="mt-1.5 text-[13px] leading-relaxed text-ink-2">
-        An examiner identity for the console. Your account is created on first sign-up.
-      </p>
+    <AuthFrame pitch="A reviewer identity for the console.">
+      <h2>Create your account</h2>
+      <p>Your account is created on first sign-up — then author or install your first Pack.</p>
 
-      <form onSubmit={onSubmit} className="mt-6 space-y-4" noValidate>
+      <form onSubmit={onSubmit} noValidate>
         <Field label="Name" value={name} onChange={setName} placeholder="Ada Lovelace" autoComplete="name" />
-        <Field
-          label="Email"
-          type="email"
-          value={email}
-          onChange={setEmail}
-          placeholder="you@papermind.io"
-          autoComplete="email"
-        />
-        <Field
-          label="Password"
-          type="password"
-          value={password}
-          onChange={setPassword}
-          placeholder="min. 8 characters"
-          autoComplete="new-password"
-        />
-        <Field
-          label="Confirm password"
-          type="password"
-          value={confirm}
-          onChange={setConfirm}
-          placeholder="repeat password"
-          autoComplete="new-password"
-        />
-
+        <Field label="Email" type="email" value={email} onChange={setEmail} placeholder="you@papermind.io" autoComplete="email" />
+        <Field label="Password" type="password" value={password} onChange={setPassword} placeholder="min. 8 characters" autoComplete="new-password" />
+        <Field label="Confirm password" type="password" value={confirm} onChange={setConfirm} placeholder="repeat password" autoComplete="new-password" />
         {error && (
-          <p role="alert" className="flex items-center gap-1.5 text-[12px] text-missing">
-            <IconAlert width={13} height={13} className="shrink-0" />
-            {error}
-          </p>
+          <p role="alert" className="auth-error"><IconAlert className="ic sm" />{error}</p>
         )}
-
-        <button
-          type="submit"
-          disabled={busy}
-          className="flex w-full items-center justify-center gap-1.5 rounded-none bg-accent px-4 py-2.5 text-[13px] font-medium text-accent-ink shadow-xs transition-all hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-60"
-        >
+        <ActionButton type="submit" disabled={busy} variant="primary" className="wfull" icon={<IconArrowRight className="ic sm" />}>
           {busy ? 'Creating account…' : 'Create account'}
-          <IconArrowRight width={14} height={14} />
-        </button>
+        </ActionButton>
       </form>
 
-      <div className="mt-6 flex items-center justify-between border-t border-rule-2 pt-4">
-        <p className="text-[12px] text-ink-3">Already have an account?</p>
-        <Link href="/login" className="text-[12.5px] font-medium text-accent hover:underline">
-          Sign in
-        </Link>
-      </div>
+      <p className="login-foot">
+        Already have an account? <Link href="/login">Sign in</Link>
+      </p>
     </AuthFrame>
   );
 }

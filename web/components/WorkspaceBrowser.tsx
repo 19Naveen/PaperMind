@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import type { WorkspaceOut } from '@/lib/api';
-import { Button, Card, CardBody, CardKicker, CardMeta, CardTitle, Tag, Td, Th } from '@/components/ui';
+import type { WorkspaceDetailOut } from '@/lib/api';
+import { IconArrowRight, IconClock, IconDoc, IconLayers, IconSearch } from '@/lib/icons';
 
 export interface RecentSession {
   id: string;
@@ -14,11 +14,33 @@ export interface RecentSession {
   updatedAt: string;
 }
 
+function dateLabel(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Unknown date';
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function statusLabel(status: string): string {
+  return status.replace(/_/g, ' ');
+}
+
+function dotClass(status: string): string {
+  if (status === 'failed') return 'warn';
+  if (status === 'complete') return 'acc';
+  return 'acc';
+}
+
+function actClass(status: string): string {
+  if (status === 'failed') return 'warn';
+  if (status === 'complete') return 'ok';
+  return '';
+}
+
 export function WorkspaceBrowser({
   workspaces,
   recentSessions,
 }: {
-  workspaces: WorkspaceOut[];
+  workspaces: WorkspaceDetailOut[];
   recentSessions: RecentSession[];
 }) {
   const [query, setQuery] = useState('');
@@ -29,89 +51,119 @@ export function WorkspaceBrowser({
       `${workspace.name} ${workspace.goal} ${workspace.pack_name ?? ''}`.toLowerCase().includes(term),
     );
   }, [query, workspaces]);
+  const reviewSessions = recentSessions.filter((session) => session.status !== 'complete');
 
   return (
-    <>
-      <section className="px-4 pb-8 pt-6 sm:px-6">
-        <div className="mb-3.5 flex flex-wrap items-baseline gap-3">
-          <p className="eyebrow mr-auto font-bold text-ink">Workspaces · {workspaces.length}</p>
-          <label className="sr-only" htmlFor="workspace-filter">Filter workspaces</label>
-          <input
-            id="workspace-filter"
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Filter workspaces"
-            className="w-full border border-rule bg-surface px-2 py-1.5 text-[13px] text-ink outline-none placeholder:text-ink-3 focus:border-accent sm:w-[220px]"
-          />
+    <div className="home-grid">
+      <section aria-labelledby="workspaces-heading">
+        <div className="sec-head" style={{ justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+            <h2 id="workspaces-heading">Workspaces</h2>
+            <span className="count">{workspaces.length}</span>
+          </div>
+          <label className="search" style={{ maxWidth: 240, flex: '0 1 240px' }}>
+            <IconSearch className="ic sm" />
+            <input
+              className="input"
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Filter workspaces"
+              aria-label="Filter workspaces"
+            />
+          </label>
         </div>
-        <div className="grid grid-cols-1 gap-[18px] md:grid-cols-2 xl:grid-cols-3">
+
+        <div className="ws-grid">
           {filtered.map((workspace) => {
-            const packKicker = workspace.pack_name && workspace.pack_version
-              ? `${workspace.pack_name} · v${workspace.pack_version}`
-              : 'No pack installed';
-            const updated = new Date(workspace.updated_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+            const updated = dateLabel(workspace.updated_at);
+            const sessions = workspace.session_count;
+            const docs = workspace.assets.length;
+            const completed = workspace.sessions.filter((s) => s.status === 'complete').length;
+            const progress = sessions > 0 ? Math.round((completed / sessions) * 100) : 0;
             return (
-              <Card key={workspace.id} pad={false} className="flex min-h-[212px] flex-col p-5 shadow-sm transition-shadow hover:shadow-md">
-                <CardKicker className="text-accent">{packKicker}</CardKicker>
-                <CardTitle className="mt-1 text-[21px]">{workspace.name}</CardTitle>
-                <CardBody className="mt-2">{workspace.goal}</CardBody>
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  <Tag>{workspace.session_count} session{workspace.session_count === 1 ? '' : 's'}</Tag>
-                  <Tag variant="outline">Updated {updated}</Tag>
+              <Link key={workspace.id} href={`/workspace/${workspace.id}`} className="card ws-card">
+                <div className="ws-top">
+                  <h3>{workspace.name}</h3>
+                  <span className={`tag ${workspace.pack_id ? 'acc' : 'out'}`}>{workspace.pack_id ? 'Active' : 'Draft'}</span>
                 </div>
-                <CardMeta className="mt-3">
-                  <Button href={`/workspace/${workspace.id}/pack`} variant="ghost" size="sm">{workspace.pack_id ? 'View pack' : 'Build pack'}</Button>
-                  <Button href={`/workspace/${workspace.id}`} variant="primary" size="sm" className="ml-auto">Open</Button>
-                </CardMeta>
-              </Card>
+                <p className="ws-pack">
+                  <IconLayers className="ic sm" />
+                  {workspace.pack_name ?? 'No pack installed'}
+                  {workspace.pack_version !== null && <span className="stamp">v{workspace.pack_version}</span>}
+                </p>
+                <p className="ws-desc">{workspace.goal || 'No workspace goal has been set yet.'}</p>
+                <div className="ws-meta">
+                  <span className="sp"><IconDoc className="ic sm" /> {docs} doc{docs === 1 ? '' : 's'}</span>
+                  <span className="sp"><IconClock className="ic sm" /> {sessions} session{sessions === 1 ? '' : 's'}</span>
+                  {sessions > 0 && (
+                    <>
+                      <span className="ws-bar" aria-label={`${progress}% executed`}><i style={{ width: `${progress}%` }} /></span>
+                      <span className="mono">{progress}%</span>
+                    </>
+                  )}
+                </div>
+                <div className="ws-foot">
+                  <span>{workspace.pack_id ? `Last run ${updated}` : updated}</span>
+                  <span className="ws-open">{workspace.pack_id ? 'Open' : 'Continue'} <IconArrowRight className="ic sm" /></span>
+                </div>
+              </Link>
             );
           })}
           {filtered.length === 0 && (
-            <div className="col-span-full border border-dashed border-rule px-6 py-10 text-center text-[13px] text-ink-2">
-              No workspaces match “{query}”.
+            <div className="card empty">
+              <span className="e-ic"><IconSearch className="ic lg" /></span>
+              <h3>No workspaces match “{query}”</h3>
+              <p>Try a different filter, or create a new workspace.</p>
             </div>
-          )}
-          {!query && (
-            <Link href="/workspace/new" className="group flex min-h-[212px] flex-col justify-between border-2 border-dashed border-accent/70 bg-accent-soft p-5 shadow-xs transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2">
-              <span className="flex size-9 items-center justify-center border border-accent bg-ground text-[24px] leading-none text-accent transition-colors group-hover:border-accent-ink group-hover:bg-accent group-hover:text-accent-ink" aria-hidden>+</span>
-              <span>
-                <span className="eyebrow block text-accent">Workspace</span>
-                <span className="display mt-1 block text-[21px] font-extrabold leading-tight text-accent transition-colors group-hover:text-accent-ink">New workspace</span>
-                <span className="mt-1 block max-w-[34ch] text-[13px] leading-relaxed text-ink-2 transition-colors group-hover:text-accent-ink">Create a blank workspace, then build or install the Pack it will run.</span>
-              </span>
-            </Link>
           )}
         </div>
       </section>
 
-      <div className="mx-4 border-t-2 border-rule sm:mx-6" />
-
-      <section className="px-4 pb-6 pt-10 sm:px-6">
-          <div className="mb-3.5 flex flex-wrap items-baseline gap-3">
-            <p className="eyebrow mr-auto font-bold text-ink">Recent activity</p>
+      <aside className="rail" aria-label="Review queue and activity">
+        <section className="card" aria-labelledby="review-heading">
+          <div className="card-hd">
+            <h3 id="review-heading">Needs your review</h3>
+            {reviewSessions.length > 0 && <span className="tag out">{reviewSessions.length}</span>}
           </div>
+          <div className="queue">
+            {reviewSessions.length > 0 ? (
+              reviewSessions.map((session) => (
+                <Link key={`${session.workspaceId}:${session.id}`} className="q-item" href={`/workspace/${session.workspaceId}/sessions/${session.id}`}>
+                  <span className={`q-dot ${dotClass(session.status)}`} />
+                  <span className="q-main">
+                    <b>{session.title}</b>
+                    <small>{session.workspaceName} · {statusLabel(session.status)}</small>
+                  </span>
+                  <span className="q-go">Review</span>
+                </Link>
+              ))
+            ) : (
+              <p className="fineprint" style={{ padding: '12px 16px' }}>No active sessions need attention.</p>
+            )}
+          </div>
+        </section>
+
+        <section className="card" aria-labelledby="activity-heading">
+          <div className="card-hd"><h3 id="activity-heading">Recent activity</h3></div>
           {recentSessions.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[680px] border-collapse">
-                <thead><tr><Th>Session</Th><Th>Workspace</Th><Th>Status</Th><Th>Updated</Th><Th><span className="sr-only">Action</span></Th></tr></thead>
-                <tbody>
-                  {recentSessions.map((session) => (
-                    <tr key={`${session.workspaceId}:${session.id}`}>
-                      <Td className="font-semibold">{session.title}</Td>
-                      <Td>{session.workspaceName}</Td>
-                      <Td><Tag>{session.status}</Tag></Td>
-                      <Td>{new Date(session.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</Td>
-                      <Td align="right"><Button href={`/workspace/${session.workspaceId}/sessions/${session.id}`} variant="ghost" size="sm">Open</Button></Td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <ol className="act-list">
+              {recentSessions.map((session) => (
+                <li key={`${session.workspaceId}:${session.id}`} className="act">
+                  <span className={`act-ic ${actClass(session.status)}`}><IconClock className="ic sm" /></span>
+                  <div>
+                    <Link href={`/workspace/${session.workspaceId}/sessions/${session.id}`}>{session.title}</Link>
+                    <p>{session.workspaceName} · {statusLabel(session.status)}</p>
+                  </div>
+                  <time dateTime={session.updatedAt} style={{ marginLeft: 'auto' }}>{dateLabel(session.updatedAt)}</time>
+                </li>
+              ))}
+            </ol>
           ) : (
-            <p className="border border-dashed border-rule p-6 text-[13px] text-ink-2">No session activity yet. Open a workspace to start the first review.</p>
+            <p className="fineprint" style={{ padding: '12px 16px' }}>No session activity yet. Open a workspace to start the first review.</p>
           )}
-      </section>
-    </>
+        </section>
+      </aside>
+    </div>
   );
 }

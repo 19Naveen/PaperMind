@@ -1,12 +1,12 @@
 import type { Metadata } from 'next';
-import { Archivo, JetBrains_Mono } from 'next/font/google';
+import { Inter, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import { AppShell } from '@/components/AppShell';
 import { getMe, listWorkspaces } from '@/lib/api';
 
-// The modernist face: one family for body (400) and display (800).
-const archivo = Archivo({ variable: '--font-archivo', subsets: ['latin'], weight: ['400', '500', '600', '800'] });
-const jetbrains = JetBrains_Mono({ variable: '--font-jetbrains', subsets: ['latin'], weight: ['400', '500'] });
+// Premium2.0 uses Inter for display and body.
+const inter = Inter({ variable: '--font-inter', subsets: ['latin'], weight: ['400', '500', '600', '700'], display: 'swap' });
+const jetbrains = JetBrains_Mono({ variable: '--font-jetbrains', subsets: ['latin'], weight: ['400', '500'], display: 'swap' });
 
 export const metadata: Metadata = {
   title: 'PaperMind',
@@ -20,7 +20,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const workspaces = user ? await listWorkspaces() : [];
 
   return (
-    <html lang="en" className={`${archivo.variable} ${jetbrains.variable} h-full`}>
+    <html lang="en" className={`${inter.variable} ${jetbrains.variable} h-full`}>
       <body className="h-full antialiased">
         <AppShell workspaces={workspaces} user={user}>
           {children}

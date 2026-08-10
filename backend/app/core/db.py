@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from typing import ClassVar
+
 from sqlalchemy import create_engine
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from app.core.config import get_settings
 

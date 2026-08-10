@@ -5,8 +5,11 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
+
+from app.services.workflow_contract import DiffEntry, ValidationResult, WorkflowSpecV1
 
 FACT_STATES = ("verified", "unsupported", "missing")
 RUN_STATUSES = ("pending", "running", "complete", "failed")
@@ -41,6 +44,12 @@ class PackOut(BaseModel):
     name: str
     latest_version: int
     updated_at: datetime
+    installs: int = 0
+    # Latest frozen version's shape — what the Pack reviews and extracts, so the
+    # marketplace grid is informative without a per-pack detail fetch.
+    document_types: list[str] = []
+    field_names: list[str] = []
+    rule_count: int = 0
 
 
 class PackVersionOut(BaseModel):
@@ -48,6 +57,7 @@ class PackVersionOut(BaseModel):
     version: int
     created_at: datetime
     spec: PackSpec
+    contract_version: int | None = None
 
 
 class PackDetailOut(BaseModel):
@@ -60,6 +70,27 @@ class PackApprove(BaseModel):
 
     draft_session_id: uuid.UUID | None = None
     spec: PackSpec | None = None
+
+
+class PackReviewSubmit(BaseModel):
+    """Submit a draft revision for governance review."""
+
+    revision_id: uuid.UUID
+    validation_digest: str | None = None
+
+
+class PackPromoteIn(BaseModel):
+    environment: str
+
+
+class PackRestoreIn(BaseModel):
+    environment: str
+    release_id: uuid.UUID
+
+
+class PackApproveReviewOut(BaseModel):
+    version: PackVersionOut
+    release: PackReleaseOut
 
 
 class PackVersionRefOut(BaseModel):
@@ -129,6 +160,8 @@ class RunOut(BaseModel):
     cases: list[Case]
     documents: list[RunDocument]
     facts: list[Fact]
+    # The pack release this run executed under, if any.
+    release_id: uuid.UUID | None = None
 
 
 class ReportOut(BaseModel):
@@ -175,6 +208,9 @@ class CorrectionOut(BaseModel):
 # ---------------------------------------------------------------------------
 class StudioSessionCreate(BaseModel):
     title: str = "Untitled Pack"
+    workspace_id: uuid.UUID | None = None
+    pack_id: uuid.UUID | None = None
+    base_pack_version_id: uuid.UUID | None = None
 
 
 class StudioMessage(BaseModel):
@@ -197,6 +233,13 @@ class StudioSessionOut(BaseModel):
     status: str
     draft: PackSpec | None
     created_at: datetime
+    # Revision-lifecycle fields. All default-bearing so existing callers that build
+    # StudioSessionOut without them keep working.
+    workspace_id: uuid.UUID | None = None
+    created_by_id: uuid.UUID | None = None
+    base_pack_version_id: uuid.UUID | None = None
+    current_revision: StudioDraftRevisionOut | None = None
+    turns: list[StudioTurnOut] = []
 
 
 class StudioDraftOut(BaseModel):
@@ -233,6 +276,9 @@ class LoginIn(BaseModel):
 class WorkspaceCreate(BaseModel):
     name: str = Field(min_length=1)
     goal: str = ""
+    # Deployment target for the workspace's Pack. Default keeps pre-lifecycle callers
+    # (and existing tests) reading as the production tenant they already are.
+    environment: Literal["development", "staging", "production"] = "production"
 
 
 class PackAssetOut(BaseModel):
@@ -261,6 +307,9 @@ class WorkspaceOut(BaseModel):
     pack_version: int | None
     session_count: int
     updated_at: datetime
+    # Deployment target for the workspace's Pack. Default keeps pre-lifecycle callers
+    # (and existing tests) reading as the production tenant they already are.
+    environment: str = "production"
 
 
 class WorkspaceDetailOut(WorkspaceOut):
@@ -305,3 +354,119 @@ class MeUpdate(BaseModel):
 class PasswordUpdate(BaseModel):
     current_password: str = Field(min_length=1)
     new_password: str = Field(min_length=8)
+
+
+# ---------------------------------------------------------------------------
+# Studio revision lifecycle — DTOs for the draft-revision / turn / test-run tables.
+# WorkflowSpecV1 / DiffEntry / ValidationResult are re-exported from the pure domain
+# module workflow_contract; embedding them here keeps the persisted shape canonical.
+# ---------------------------------------------------------------------------
+class StudioTurnOut(BaseModel):
+    id: uuid.UUID
+    session_id: uuid.UUID
+    role: str
+    content: str
+    model_id: str | None
+    status: str
+    revision_id: uuid.UUID | None
+    created_at: datetime
+
+
+class StudioDraftRevisionOut(BaseModel):
+    id: uuid.UUID
+    session_id: uuid.UUID
+    revision_no: int
+    parent_id: uuid.UUID | None
+    workflow: WorkflowSpecV1
+    diff: list[DiffEntry]
+    validation: ValidationResult
+    digest: str
+    model_id: str | None
+    created_by_id: uuid.UUID | None
+    created_at: datetime
+
+
+class StudioTestRunOut(BaseModel):
+    id: uuid.UUID
+    revision_id: uuid.UUID
+    document_ids: list[uuid.UUID]
+    summary: dict[str, object]
+    digest: str
+    created_at: datetime
+
+
+# ---------------------------------------------------------------------------
+# Run telemetry + pack release/governance lifecycle
+# ---------------------------------------------------------------------------
+class RunNodeAttemptOut(BaseModel):
+    id: uuid.UUID
+    run_id: uuid.UUID
+    node_id: str
+    attempt_no: int
+    status: str
+    started_at: datetime
+    finished_at: datetime | None = None
+    branch_reason: str | None = None
+    error_code: str | None = None
+    error_message: str | None = None
+    output_digest: str | None = None
+
+
+class PackReviewOut(BaseModel):
+    id: uuid.UUID
+    pack_id: uuid.UUID
+    revision_id: uuid.UUID | None = None
+    submitted_by: uuid.UUID | None = None
+    submitted_at: datetime
+    approved_by: uuid.UUID | None = None
+    approved_at: datetime | None = None
+    state: str
+    validation_digest: str | None = None
+
+
+class PackReleaseOut(BaseModel):
+    id: uuid.UUID
+    pack_id: uuid.UUID
+    pack_version_id: uuid.UUID
+    environment: str
+    action: str
+    source_release_id: uuid.UUID | None = None
+    restored_from_release_id: uuid.UUID | None = None
+    created_by: uuid.UUID | None = None
+    created_at: datetime
+
+
+class PackAuditEventOut(BaseModel):
+    id: uuid.UUID
+    pack_id: uuid.UUID
+    event_type: str
+    actor_id: uuid.UUID | None = None
+    revision_id: uuid.UUID | None = None
+    version_id: uuid.UUID | None = None
+    release_id: uuid.UUID | None = None
+    environment: str | None = None
+    metadata: dict[str, object] = Field(default_factory=dict)
+    created_at: datetime
+
+
+# ---------------------------------------------------------------------------
+# Wave4 governance/release lifecycle
+# ---------------------------------------------------------------------------
+class GovernanceReviewSubmit(BaseModel):
+    pack_id: uuid.UUID
+    revision_id: uuid.UUID
+
+
+class GovernanceReviewDecision(BaseModel):
+    approve: bool
+
+
+class GovernanceReleasePromote(BaseModel):
+    pack_version_id: uuid.UUID
+    environment: Literal["development", "staging", "production"]
+    source_release_id: uuid.UUID | None = None
+
+
+class GovernanceDecisionOut(BaseModel):
+    review: PackReviewOut
+    version: PackVersionOut | None = None

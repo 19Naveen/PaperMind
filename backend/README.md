@@ -124,7 +124,7 @@ backend/
       security.py        # scrypt password hashing, HMAC-signed session cookies
     api/
       deps.py            # request-scoped DB + `current_user` auth dependency
-      v1/routers/        # auth, packs, documents, runs, studio, workspaces
+      routers/           # auth, packs, documents, runs, studio, workspaces (mounted at root)
     services/
       ingest.py          # parse -> flatten with page offsets -> chunk -> embed
       retrieval.py       # hybrid pgvector + ts_rank, RRF merge (swap point)
@@ -142,7 +142,7 @@ backend/
 ```
 
 > Layout note: `repositories/`, `models/`, and `schemas/` are packages exposed via their
-> `__init__.py`; `services/` and `api/v1/routers/` hold the per-feature modules. The
+> `__init__.py`; `services/` and `api/routers/` hold the per-feature modules. The
 > data-model packages are empty — see the `repositories/` discrepancy below.
 
 ---
@@ -270,9 +270,37 @@ not a build item, until that trigger fires.
 | Repository/service layer | there is a second implementation (see layout note above) |
 | Multi-tenant orgs | there is a second organisation — users exist, tenancy does not |
 
-**Marketplace** — publishing (`pack_publications`) plus a Registry UI is scoped for once a
-second workspace wants a Pack the first authored. Install = copy a `pack_version` reference
-into a workspace; the web `/marketplace` already defines the fields it needs.
+**Marketplace** — shipped. A Pack is authored/approved in the Studio, listed with a
+per-pack install count and latest-version summary, opened on a detail page, and installed
+into a workspace. A published Pack may serve many workspaces (one Pack per workspace,
+enforced in route code). Editing a published Pack authors a new immutable version. Catalogue
+metadata (category, blurb) is still display-only seed data on the web side; a backend
+metadata field is the deferred follow-up.
+
+**Enterprise Pack engine (shipped, backend).** A canonical `WorkflowSpecV1` contract lives
+in `app/services/workflow_contract.py` — an explicit, validated, typed-port DAG with
+conditional edges, retry/timeout/failure policies, deterministic legacy adaptation, compile,
+diff, and digest. `pack_versions.contract_version` (nullable, additive migration
+`e32606184ec1`) distinguishes legacy `NULL`/v0 rows from canonical v1 rows; historical
+`spec` JSON is never mutated. The engine is implemented across:
+
+- **Studio revisions** — `app/repositories/studio.py` + `app/services/studio.py` persist
+  immutable draft revisions (full workflow snapshot + parent + diff + validation + digest)
+  and turns; editing a published Pack seeds revision1 from the latest frozen version. The
+  studio router wires multi-turn authoring, revision list/detail, and revision-scoped tests.
+- **DAG runtime** — `app/services/workflow_runtime.py` + `app/repositories/runs.py` compile
+  and execute the workflow topology (branching, retries, timeouts, per-node failure policy,
+  append-only `run_node_attempts` telemetry, and a writes-nothing `execute_workflow_preview`),
+  reusing the existing evidence/verification primitives. `runtime.execute_run` is now
+  workflow-driven (legacy Packs adapt through the same path).
+- **Governance/release** — `app/services/releases.py` + `app/repositories/releases.py`
+  implement submit-for-review → approve → development → staging → production promotion,
+  immutable `pack_audit_events`/`pack_releases`, forward-only restore, review-gated version
+  creation, and environment-aware run resolution (runs pin `release_id`).
+
+The engine's frontend authoring UI (revisions/diff/validation/test/review panes, release
+console) is deferred, as are RBAC/organisations, arbitrary code/HTTP nodes, loops,
+distributed workers, and a connector marketplace.
 
 **Corrections → v2 diff** — `corrections` rows accumulate and nothing reads them yet. The
 v2-diff proposer stays deferred until there is a real correction corpus to learn from.

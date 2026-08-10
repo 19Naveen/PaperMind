@@ -40,7 +40,7 @@ target-version = "py311"
 select = ["E", "F", "I", "UP", "B", "SIM", "ANN", "ASYNC", "S", "RUF"]
 
 [tool.ruff.lint.per-file-ignores]
-"app/models.py" = ["E501"]
+"app/models/__init__.py" = ["E501"]
 "alembic/versions/*" = ["E501"]
 "tests/*" = ["S101", "ANN001", "ANN201", "ANN202"]
 

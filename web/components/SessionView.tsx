@@ -1,21 +1,25 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import type { ChatMessage, Fact, RunOut, RunStatus, WorkspaceSessionOut } from '@/lib/api';
+import type { ChatMessage, Fact, FactState, RunOut, RunStatus, WorkspaceSessionOut } from '@/lib/api';
 import { correctFactAction, deleteSessionAction, startRunAction, updateSessionAction, uploadDocumentAction } from '@/lib/session';
+import { ActionButton, EmptyState, Input, Pill, Tag, type PillTone } from '@/components/ui';
 import {
-  ActionButton,
-  Card,
-  CardBody,
-  CardKicker,
-  CardTitle,
-  Divider,
-  PageHeader,
-  Pill,
-  Tag,
-  type PillTone,
-} from '@/components/ui';
+  IconAlert,
+  IconArrowRight,
+  IconCheck,
+  IconClose,
+  IconDoc,
+  IconGrid,
+  IconLayers,
+  IconPlay,
+  IconPlus,
+  IconRefresh,
+  IconSearch,
+  IconSparkle,
+} from '@/lib/icons';
 
 /** The engine's fixed execution order — mirrors backend/app/runtime.py STAGES. */
 const RUN_STAGES = ['classify', 'retrieve', 'extract', 'verify', 'cross-validate', 'report'] as const;
@@ -27,43 +31,72 @@ const STATUS_TONE: Record<RunStatus, PillTone> = {
   failed: 'missing',
 };
 
-const FACT_TONE: Record<Fact['state'], PillTone> = {
-  verified: 'verified',
-  unsupported: 'missing',
-  missing: 'neutral',
-};
+type Surface = 'checklist' | 'grid' | 'diff' | 'explorer';
 
-/** A run's stage timeline: done before the current stage, active at it, pending after. */
-function StageTimeline({ run }: { run: RunOut }) {
-  const activeIndex = run.stage ? RUN_STAGES.indexOf(run.stage as (typeof RUN_STAGES)[number]) : -1;
-  const finished = run.status === 'complete' || run.status === 'failed';
+const SURFACE_TABS: { id: Surface; label: string; icon: ReactNode }[] = [
+  { id: 'checklist', label: 'Checklist', icon: <IconCheck className="ic sm" /> },
+  { id: 'grid', label: 'Grid', icon: <IconGrid className="ic sm" /> },
+  { id: 'diff', label: 'Diff', icon: <IconLayers className="ic sm" /> },
+  { id: 'explorer', label: 'Explorer', icon: <IconSearch className="ic sm" /> },
+];
+
+/** Padlock — used on the locked/roadmap surfaces. Not in icons.tsx; inline keeps globals/ui untouched. */
+function IconLock({ className = 'ic' }: { className?: string }) {
   return (
-    <ol className="divide-y divide-rule">
-      {RUN_STAGES.map((stage, index) => {
-        const done = finished || (activeIndex >= 0 && index < activeIndex);
-        const active = run.status === 'running' && index === activeIndex;
-        return (
-          <li key={stage} className="grid grid-cols-[30px_1fr_auto] items-center gap-2 py-2 text-[12px]">
-            <span className={`font-data ${done ? 'text-verified' : active ? 'text-running' : 'text-ink-3'}`}>
-              {String(index + 1).padStart(2, '0')}
-            </span>
-            <span className={done || active ? 'text-ink' : 'text-ink-3'}>{stage}</span>
-            <span className={`font-data text-[10px] ${done ? 'text-verified' : active ? 'text-running' : 'text-ink-3'}`}>
-              {done ? 'done' : active ? 'running…' : '—'}
-            </span>
-          </li>
-        );
-      })}
-    </ol>
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="5" y="11" width="14" height="9" rx="2" />
+      <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+    </svg>
   );
 }
 
+function utcHHMM(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
+}
+
+function titleCase(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/** State pill — verified/missing via the Pill primitive; unsupported needs `.pill.warn`, which the
+ * primitive does not expose, so it is rendered directly with the reference class. */
+function StatePill({ state }: { state: FactState }) {
+  if (state === 'verified') return <Pill tone="verified" dot>Verified</Pill>;
+  if (state === 'missing') return <Pill tone="missing" dot>Missing</Pill>;
+  return (
+    <span className="pill warn">
+      <span className="dot" />
+      Unsupported
+    </span>
+  );
+}
+
+function stateIcon(state: FactState) {
+  if (state === 'verified') return <IconCheck className="ic sm" />;
+  if (state === 'unsupported') return <IconAlert className="ic sm" />;
+  return <IconClose className="ic sm" />;
+}
+
+/** One fact as a `.chk` row. Corrections append via `correctFactAction` and stay logged-only. */
 function FactRow({ fact, runId, workspaceId }: { fact: Fact; runId: string; workspaceId: string }) {
+  const [open, setOpen] = useState(false);
   const [value, setValue] = useState(fact.value ?? '');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const correctable = fact.state !== 'verified';
+  const citation = fact.citations[0];
 
   async function submit() {
     if (!value.trim() || saving) return;
@@ -71,44 +104,47 @@ function FactRow({ fact, runId, workspaceId }: { fact: Fact; runId: string; work
     await correctFactAction(workspaceId, runId, fact.id, value.trim(), note.trim() || undefined);
     setSaving(false);
     setSaved(true);
+    setOpen(false);
   }
 
   return (
-    <div className="border-b border-rule py-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="min-w-0 flex-1 font-data text-[12px] font-medium text-ink">{fact.field}</span>
-        <Pill tone={FACT_TONE[fact.state]}>{fact.state}</Pill>
-      </div>
-      <p className="mt-1 text-[13px] leading-relaxed text-ink-2">{fact.value ?? '—'}</p>
-      {fact.citations.length > 0 && (
-        <div className="mt-2 space-y-1.5">
-          {fact.citations.map((citation, i) => (
-            <blockquote key={i} className="border-l-2 border-rule pl-3">
-              <p className="text-[12px] leading-relaxed text-ink-2">“{citation.quote}”</p>
-              <p className="mt-0.5 font-data text-[10px] text-ink-3">
-                {citation.document_name} · page {citation.page}
-              </p>
-            </blockquote>
-          ))}
+    <div className={`chk st-${fact.state}`}>
+      <div className="chk-ic">{stateIcon(fact.state)}</div>
+      <div>
+        <div className="chk-line1">
+          <span className="chk-name">{fact.field}</span>
         </div>
-      )}
-      {correctable && (
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <input
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            placeholder="Your corrected value"
-            className="min-w-0 flex-1 border border-rule bg-surface px-2.5 py-1.5 text-[12px] text-ink outline-none placeholder:text-ink-3 focus:border-accent"
-          />
-          <input
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Note (optional)"
-            className="w-40 border border-rule bg-surface px-2.5 py-1.5 text-[12px] text-ink outline-none placeholder:text-ink-3 focus:border-accent"
-          />
-          <ActionButton size="sm" variant={saved ? 'secondary' : 'primary'} onClick={submit} disabled={saving || saved}>
-            {saved ? 'Saved' : 'Correct'}
-          </ActionButton>
+        <div className="chk-value">{fact.value ?? '—'}</div>
+        {citation && citation.quote && (
+          <blockquote className="ev">
+            “{citation.quote}”
+            <cite>
+              {citation.document_name} · page {citation.page}
+            </cite>
+          </blockquote>
+        )}
+      </div>
+      <div className="chk-side">
+        <StatePill state={fact.state} />
+        {correctable && !saved && (
+          <button type="button" className="btn ghost sm" onClick={() => setOpen((o) => !o)}>
+            {open ? 'Close' : 'Correct'}
+          </button>
+        )}
+        {saved && <span className="chk-note">Logged</span>}
+      </div>
+      {correctable && open && !saved && (
+        <div className="chk-form">
+          <Input value={value} onChange={setValue} placeholder="Corrected value" size="sm" />
+          <Input value={note} onChange={setNote} placeholder="Note (optional)" size="sm" />
+          <div className="row">
+            <ActionButton size="sm" variant="ghost" onClick={() => setOpen(false)}>
+              Cancel
+            </ActionButton>
+            <ActionButton size="sm" variant="primary" onClick={() => void submit()} disabled={saving || !value.trim()}>
+              {saving ? 'Saving…' : 'Save correction'}
+            </ActionButton>
+          </div>
         </div>
       )}
     </div>
@@ -132,16 +168,23 @@ export function SessionView({ workspaceId, workspaceName, session, run }: Sessio
   const [liveRun, setLiveRun] = useState(run);
   const [uploaded, setUploaded] = useState<{ id: string; name: string }[]>([]);
   const [starting, setStarting] = useState(false);
-  const [subject, setSubject] = useState(session.subject ?? '');
-  const [subjectDirty, setSubjectDirty] = useState(false);
   const [title, setTitle] = useState(session.title);
   const [isRenaming, setIsRenaming] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [surface, setSurface] = useState<Surface>('checklist');
   const replyRef = useRef('');
 
   const status: RunStatus =
     liveRun?.status ?? (liveSession.status === 'complete' ? 'complete' : 'pending');
   const running = status === 'pending' || status === 'running';
+
+  // Documents visible in the rail: those already classified on the run plus any
+  // uploaded this visit that the run has not seen yet.
+  const railDocs = [
+    ...(liveRun?.documents.map((d) => ({ id: d.id, name: d.name })) ?? []),
+    ...uploaded.filter((u) => !liveRun?.documents.some((d) => d.id === u.id)),
+  ];
+  const hasDocs = railDocs.length > 0;
 
   // Poll the run route while the engine works (CLAUDE.md §4.2 wants TanStack Query for
   // this; it is not installed, so the poll goes through a route handler instead).
@@ -214,14 +257,10 @@ export function SessionView({ workspaceId, workspaceName, session, run }: Sessio
 
   async function start() {
     if (starting) return;
+    const ids = railDocs.map((d) => d.id);
+    if (ids.length === 0) return;
     setStarting(true);
-    await startRunAction(workspaceId, session.id, uploaded.map((d) => d.id));
-    router.refresh();
-  }
-
-  async function saveSubject() {
-    await updateSessionAction(workspaceId, session.id, { subject: subject.trim() || undefined });
-    setSubjectDirty(false);
+    await startRunAction(workspaceId, session.id, ids);
     router.refresh();
   }
 
@@ -233,211 +272,356 @@ export function SessionView({ workspaceId, workspaceName, session, run }: Sessio
     router.refresh();
   }
 
+  // Pipeline progress — bar fills to the reached stage, full when the run is terminal.
+  const activeIndex = liveRun?.stage
+    ? RUN_STAGES.indexOf(liveRun.stage as (typeof RUN_STAGES)[number])
+    : -1;
+  const finished = status === 'complete' || status === 'failed';
+  const progressPct = finished ? 100 : activeIndex >= 0 ? Math.round(((activeIndex + 1) / RUN_STAGES.length) * 100) : 0;
+  const pipeTime = liveRun && utcHHMM(liveRun.started_at) ? `${utcHHMM(liveRun.started_at)} UTC` : '—';
+
+  const statusLabel = status === 'running'
+    ? liveRun?.stage ? titleCase(liveRun.stage) : 'Running'
+    : status === 'complete' ? 'Complete'
+    : status === 'failed' ? 'Failed'
+    : 'Pending';
+
+  const stamp = liveRun
+    ? `Pack ${liveRun.pack_name} v${liveRun.pack_version}${utcHHMM(liveRun.started_at) ? ` · ${utcHHMM(liveRun.started_at)} UTC` : ''}`
+    : 'No run yet';
+
   const renderedMessages = [...messages, ...(streaming ? [{ role: 'assistant' as const, content: reply }] : [])];
 
+  // Checklist summary counts — counted from real run facts by state.
+  const facts = liveRun?.facts ?? [];
+  const counts = {
+    total: facts.length,
+    verified: facts.filter((f) => f.state === 'verified').length,
+    unsupported: facts.filter((f) => f.state === 'unsupported').length,
+    missing: facts.filter((f) => f.state === 'missing').length,
+  };
+
+  const showResults = liveRun && status === 'complete';
+
   return (
-    <main className="flex min-h-full flex-col bg-ground text-ink">
-      <PageHeader
-        eyebrow={`Session in ${workspaceName}`}
-        title={isRenaming ? (
-          <span className="flex flex-wrap items-center gap-2">
-            <label className="sr-only" htmlFor="session-title-edit">Session title</label>
-            <input id="session-title-edit" value={title} onChange={(event) => setTitle(event.target.value)} className="w-[min(72vw,360px)] border border-rule bg-surface px-2 py-1 font-sans text-[14px] font-normal text-ink outline-none focus:border-accent" />
-            <ActionButton size="sm" variant="primary" onClick={() => void saveTitle()} disabled={!title.trim()}>Save</ActionButton>
-          </span>
-        ) : title}
-        actions={
-          <>
-            <Tag variant="neutral">{liveRun ? `Pack ${liveRun.pack_name} v${liveRun.pack_version}` : 'Pack pending'}</Tag>
-            <ActionButton size="sm" variant="secondary" onClick={() => setIsRenaming((value) => !value)}>{isRenaming ? 'Cancel' : 'Rename'}</ActionButton>
-            <ActionButton size="sm" variant="danger" onClick={() => setIsDeleteOpen(true)}>Delete</ActionButton>
-            <ActionButton size="sm" variant="primary" onClick={() => void start()} disabled={starting || running || uploaded.length === 0}>{starting ? 'Starting…' : liveRun ? 'Run again' : 'Start run'}</ActionButton>
-          </>
-        }
-      />
-      <div className="grid min-h-0 flex-1 lg:grid-cols-[452px_minmax(0,1fr)]">
-        <aside className="flex min-h-0 flex-col border-b-2 border-rule bg-surface lg:border-b-0 lg:border-r-2">
-          <div className="flex items-center justify-between border-b border-rule px-5 py-3">
-            <p className="eyebrow text-accent">Session state</p>
-            <Pill tone={STATUS_TONE[status]} dot={running}>
-              {status}
-            </Pill>
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto px-5">
-            <section className="border-b border-rule py-4">
-              <p className="eyebrow">Subject</p>
-              <div className="mt-2 flex gap-2">
+    <section className="view full active">
+      <div className="sess-head page-head" style={{ marginBottom: 0 }}>
+        <div>
+          <p className="eyebrow">{workspaceName} · Session</p>
+          <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 11, flexWrap: 'wrap' }}>
+            {isRenaming ? (
+              <>
+                <label className="sr-only" htmlFor="session-title-edit">Session title</label>
                 <input
-                  value={subject}
-                  onChange={(e) => {
-                    setSubject(e.target.value);
-                    setSubjectDirty(true);
-                  }}
-                  placeholder="What is this session reviewing?"
-                  className="min-w-0 flex-1 border border-rule bg-raised px-2.5 py-1.5 text-[13px] text-ink outline-none placeholder:text-ink-3 focus:border-accent"
+                  id="session-title-edit"
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                  className="input"
+                  style={{ width: 'min(70vw, 360px)', height: 38 }}
                 />
-                <ActionButton size="sm" onClick={saveSubject} disabled={!subjectDirty}>
+                <ActionButton size="sm" variant="primary" onClick={() => void saveTitle()} disabled={!title.trim()}>
                   Save
                 </ActionButton>
-              </div>
-            </section>
-
-            <section className="border-b border-rule py-4">
-              <p className="eyebrow">Uploaded files</p>
-              {uploaded.length > 0 ? (
-                <div className="mt-2 space-y-2">
-                  {uploaded.map((file) => (
-                    <div key={file.id} className="flex justify-between gap-3 font-data text-[11px]">
-                      <span className="truncate">{file.name}</span>
-                      <span className="text-ink-3">queued for run</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="mt-2 text-[12px] text-ink-2">No documents uploaded.</p>
-              )}
-              <form action={onUpload} className="mt-2 flex gap-2">
-                <label className="flex min-w-0 flex-1 cursor-pointer items-center justify-center gap-1.5 border border-dashed border-rule px-2 py-1.5 text-[12px] text-ink-2 transition-colors hover:border-accent hover:text-ink">
-                  Upload PDF or text
-                  <input name="file" type="file" accept=".pdf,.txt" className="sr-only" required onChange={(e) => e.target.form?.requestSubmit()} />
-                </label>
-              </form>
-              <button
-                onClick={start}
-                disabled={starting || running || uploaded.length === 0}
-                className="mt-2 w-full border border-accent bg-accent px-3 py-1.5 text-[13px] font-medium text-accent-ink transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {starting ? 'Starting…' : running ? 'Run in progress' : 'Start run'}
-              </button>
-            </section>
-
-            {liveRun && (running || status === 'complete' || status === 'failed') && (
-              <section className="border-b border-rule py-4">
-                <p className="eyebrow text-accent">Pack execution</p>
-                <div className="mt-2">
-                  <StageTimeline run={liveRun} />
-                </div>
-              </section>
+              </>
+            ) : (
+              <>
+                {title}
+                <Pill tone={STATUS_TONE[status]} dot={running}>{statusLabel}</Pill>
+              </>
             )}
-
-            <section>
-              {renderedMessages.map((message, index) => (
-                <article key={index} className={`border-b border-rule py-4 ${message.role === 'user' ? 'text-right' : ''}`}>
-                  <p className={`eyebrow ${message.role === 'assistant' ? 'text-accent' : ''}`}>
-                    {message.role === 'user' ? 'You' : 'PaperMind'}
-                  </p>
-                  <p className="mt-1 whitespace-pre-line text-[13px] leading-relaxed text-ink-2">{message.content}</p>
-                </article>
-              ))}
-            </section>
-          </div>
-          <form
-            className="border-t-2 border-rule p-4"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void send(input);
-            }}
+          </h1>
+          <p className="page-sub" style={{ marginTop: 6 }}>
+            <span className="stamp">{stamp}</span>
+          </p>
+        </div>
+        <div className="page-actions">
+          <ActionButton size="sm" variant="ghost" onClick={() => setIsRenaming((value) => !value)}>
+            {isRenaming ? 'Cancel' : 'Rename'}
+          </ActionButton>
+          <ActionButton
+            size="sm"
+            variant={!liveRun ? 'primary' : 'secondary'}
+            icon={!liveRun ? <IconPlay className="ic sm" /> : <IconRefresh className="ic sm" />}
+            onClick={() => void start()}
+            disabled={starting || running || !hasDocs}
           >
-            <textarea
-              value={input}
-              onChange={(event) => setInput(event.target.value)}
-              placeholder="Ask about this session…"
-              className="min-h-[68px] w-full resize-none border border-rule bg-raised p-2.5 text-[13px] outline-none focus:border-accent"
-            />
-            <ActionButton type="submit" variant="primary" disabled={!input.trim() || streaming} className="mt-2">
-              {streaming ? 'Working…' : 'Send'}
-            </ActionButton>
-          </form>
+            {starting ? 'Starting…' : running ? 'Run in progress' : liveRun ? 'Re-run' : 'Start run'}
+          </ActionButton>
+          <ActionButton size="sm" variant="danger" onClick={() => setIsDeleteOpen(true)}>
+            Delete
+          </ActionButton>
+        </div>
+      </div>
+
+      <div className="sess-body">
+        <aside className="sess-rail" aria-label="Run state">
+          {/* Pipeline */}
+          <div className="card">
+            <div className="card-hd">
+              <h3>Pipeline</h3>
+              <span className="mono muted">{pipeTime}</span>
+            </div>
+            <div className="pipe-progress">
+              <i style={{ width: `${progressPct}%` }} />
+            </div>
+            <ol className="stages">
+              {RUN_STAGES.map((stage, index) => {
+                const done = finished || (activeIndex >= 0 && index < activeIndex);
+                const isRunning = status === 'running' && index === activeIndex;
+                return (
+                  <li key={stage} className={`stage${done ? ' done' : ''}${isRunning ? ' running' : ''}`}>
+                    <span className="st-ic">
+                      {done ? <IconCheck className="ic sm" /> : isRunning ? <span className="spin-ic" /> : index + 1}
+                    </span>
+                    <span className="st-name">{stage}</span>
+                    <span className="st-t">{done ? 'done' : isRunning ? 'running…' : '—'}</span>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+
+          {/* Documents */}
+          <div className="card">
+            <div className="card-hd">
+              <h3>Documents</h3>
+              <Tag variant="outline">{railDocs.length}</Tag>
+            </div>
+            {railDocs.length > 0 ? (
+              <ul className="doc-list">
+                {railDocs.map((doc) => (
+                  <li key={doc.id} className="doc-row">
+                    <IconDoc className="ic" />
+                    <span className="doc-name">{doc.name}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="muted" style={{ fontSize: 12, padding: '4px 16px 10px' }}>
+                No documents uploaded.
+              </p>
+            )}
+            <form action={onUpload} style={{ padding: '0 12px 4px' }}>
+              <label className="btn secondary wfull" style={{ cursor: 'pointer' }}>
+                <IconPlus className="ic sm" />
+                Add documents
+                <input
+                  name="file"
+                  type="file"
+                  accept=".pdf,.txt"
+                  className="sr-only"
+                  required
+                  onChange={(event) => event.target.form?.requestSubmit()}
+                />
+              </label>
+            </form>
+          </div>
+
+          {/* Ask about this run */}
+          <div className="card">
+            <div className="card-hd">
+              <h3>Ask about this run</h3>
+              <IconSparkle className="ic sm" style={{ color: 'var(--ink-3)' }} />
+            </div>
+            <div className="ask-log">
+              {renderedMessages.length === 0 ? (
+                <p className="muted" style={{ fontSize: 12 }}>
+                  Ask where a result came from — answers cite the source span. The run itself never changes.
+                </p>
+              ) : (
+                renderedMessages.map((message, index) => (
+                  <div key={index} className={`msg${message.role === 'user' ? ' me' : ''}`}>
+                    {message.role === 'assistant' && (
+                      <span className="msg-av">
+                        <IconSparkle className="ic sm" />
+                      </span>
+                    )}
+                    <div className="msg-bubble" style={{ whiteSpace: 'pre-line' }}>{message.content}</div>
+                  </div>
+                ))
+              )}
+            </div>
+            <form
+              className="ask-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void send(input);
+              }}
+            >
+              <input
+                value={input}
+                onChange={(event) => setInput(event.target.value)}
+                placeholder="e.g. where does the cap come from?"
+                aria-label="Ask about this run"
+              />
+              <button className="iconbtn acc" type="submit" aria-label="Ask" disabled={!input.trim() || streaming} style={{ width: 30, height: 30 }}>
+                <IconArrowRight className="ic sm" />
+              </button>
+            </form>
+          </div>
         </aside>
 
-        <section className="min-w-0 overflow-auto p-5 sm:p-7">
-          {!liveRun ? (
-            <div className="mx-auto mt-16 max-w-md border border-dashed border-rule bg-surface p-8 text-center">
-              <p className="eyebrow text-accent">No run yet</p>
-              <h2 className="display mt-2 text-[23px] font-extrabold">This session has not run</h2>
-              <p className="mt-3 text-[13px] leading-relaxed text-ink-2">
-                Upload the documents to review, then start the run. The Pack executes its six
-                stages — classify, retrieve, extract, verify, cross-validate, report — against
-                them and the extracted facts appear here with their citations.
-              </p>
-            </div>
-          ) : running ? (
-            <div className="mx-auto mt-16 max-w-md border border-dashed border-rule bg-surface p-8 text-center">
-              <p className="eyebrow text-running">Running</p>
-              <h2 className="display mt-2 text-[23px] font-extrabold">{liveRun.stage ?? 'Queued'}…</h2>
-              <p className="mt-3 text-[13px] leading-relaxed text-ink-2">
-                The engine is working through the Pack’s stages. This page updates itself;
-                the results land here when the run completes.
-              </p>
-            </div>
-          ) : status === 'failed' ? (
-            <div className="mx-auto mt-16 max-w-md border border-dashed border-missing bg-missing-soft p-8 text-center">
-              <p className="eyebrow text-missing">Failed</p>
-              <h2 className="display mt-2 text-[23px] font-extrabold">The run did not complete</h2>
-              <p className="mt-3 text-[13px] leading-relaxed text-ink-2">
-                Check the uploaded documents and start the run again.
-              </p>
-            </div>
-          ) : (
+        <section className="sess-content">
+          <div className="seg" role="tablist" aria-label="Result surfaces" style={{ alignSelf: 'flex-start' }}>
+            {SURFACE_TABS.map((tab) => (
+              <button key={tab.id} aria-pressed={surface === tab.id} onClick={() => setSurface(tab.id)}>
+                {tab.icon}
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {surface === 'checklist' && (
             <>
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="eyebrow mr-auto">Extraction report</p>
-                {liveRun.facts.length === 0 && <Tag variant="neutral">no facts extracted</Tag>}
-              </div>
-              <div className="mt-3 grid gap-3">
-                {liveRun.cases.map((c) => {
-                  const facts = liveRun.facts.filter((fact) => fact.case_id === c.id);
-                  return (
-                    <Card key={c.id} pad={false}>
-                      <div className="border-b border-rule px-4 py-3">
-                        <CardKicker>Case</CardKicker>
-                        <CardTitle className="mt-0.5 text-[16px]">{c.subject}</CardTitle>
-                      </div>
-                      <div className="px-4 pb-1">
-                        {facts.length === 0 ? (
-                          <p className="py-3 text-[12px] text-ink-2">No facts for this case.</p>
-                        ) : (
-                          facts.map((fact) => (
-                            <FactRow key={fact.id} fact={fact} runId={liveRun.id} workspaceId={workspaceId} />
-                          ))
-                        )}
-                      </div>
-                    </Card>
-                  );
-                })}
-                {liveRun.facts.length === 0 && (
-                  <p className="py-3 text-[12px] text-ink-2">
-                    This run extracted no fields — check the Pack’s spec and the documents.
-                  </p>
-                )}
-              </div>
-              <Divider className="mt-8" />
-              <section className="mt-4">
-                <CardKicker>Why this run is comparable</CardKicker>
-                <CardBody className="mt-2 max-w-3xl text-[13px] leading-relaxed text-ink-2">
-                  Every session executes the same Pack version — identical nodes, prompts,
-                  assets and report template — pinned at the moment the run started.
-                  Verified facts carry citations into the source text, so a fabricated
-                  quote lands as unsupported, not verified.
-                </CardBody>
-              </section>
+              {!liveRun ? (
+                <EmptyState
+                  icon={<IconPlay className="ic lg" />}
+                  title="No run yet"
+                  body="Upload the documents to review, then start the run. The Pack executes its six stages — classify, retrieve, extract, verify, cross-validate, report — and the extracted facts appear here with their citations."
+                />
+              ) : running ? (
+                <EmptyState
+                  icon={<IconRefresh className="ic lg" />}
+                  title={`${liveRun.stage ? titleCase(liveRun.stage) : 'Queued'}…`}
+                  body="The engine is working through the Pack's stages. This page updates itself; the results land here when the run completes."
+                />
+              ) : status === 'failed' ? (
+                <EmptyState
+                  icon={<IconAlert className="ic lg" />}
+                  title="The run did not complete"
+                  body="Check the uploaded documents and start the run again."
+                />
+              ) : showResults ? (
+                <>
+                  {/* Summary strip */}
+                  <div className="card summary" role="group" aria-label="Run summary">
+                    <div className="sum-cell">
+                      <div className="v">{counts.total}</div>
+                      <div className="l">Checks</div>
+                    </div>
+                    <div className="sum-cell ok">
+                      <div className="v">{counts.verified}</div>
+                      <div className="l">Verified</div>
+                    </div>
+                    <div className="sum-cell warn">
+                      <div className="v">{counts.unsupported}</div>
+                      <div className="l">Unsupported</div>
+                    </div>
+                    <div className="sum-cell dgr">
+                      <div className="v">{counts.missing}</div>
+                      <div className="l">Missing</div>
+                    </div>
+                  </div>
+
+                  {/* Checklist results, grouped by case */}
+                  <div className="card">
+                    <div className="card-hd">
+                      <h3>Checklist results</h3>
+                    </div>
+                    {liveRun.cases.length === 0 && facts.length === 0 ? (
+                      <p className="muted" style={{ fontSize: 12, padding: '12px 16px' }}>
+                        This run extracted no fields — check the Pack’s spec and the documents.
+                      </p>
+                    ) : (
+                      liveRun.cases.map((c) => {
+                        const caseFacts = facts.filter((fact) => fact.case_id === c.id);
+                        return (
+                          <div key={c.id}>
+                            <div className="grp">
+                              <span className="grp-name">{c.subject}</span>
+                              <span className="grp-meta">{caseFacts.length} field{caseFacts.length === 1 ? '' : 's'}</span>
+                            </div>
+                            {caseFacts.length === 0 ? (
+                              <p className="muted" style={{ fontSize: 12, padding: '4px 16px 10px' }}>
+                                No facts for this case.
+                              </p>
+                            ) : (
+                              caseFacts.map((fact) => (
+                                <FactRow key={fact.id} fact={fact} runId={liveRun.id} workspaceId={workspaceId} />
+                              ))
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* Correction ledger — honest empty: corrections are persisted but not yet listed back. */}
+                  <div className="card">
+                    <div className="card-hd">
+                      <h3>Correction ledger</h3>
+                      <span className="muted" style={{ fontSize: 11.5 }}>Logged, never silently applied</span>
+                    </div>
+                    <p className="muted" style={{ fontSize: 12.5, padding: '14px 16px', margin: 0 }}>
+                      Corrections are logged as they’re made; a read-back view is coming. Each correction feeds the next Pack draft.
+                    </p>
+                  </div>
+                </>
+              ) : null}
             </>
+          )}
+
+          {surface === 'grid' && (
+            <EmptyState
+              icon={<IconLock className="ic lg" />}
+              title="Grid is on the roadmap"
+              body="Grid (field comparison across documents) is on the roadmap; it needs per-document values the run doesn’t expose yet."
+            />
+          )}
+
+          {surface === 'diff' && (
+            <EmptyState
+              icon={<IconLock className="ic lg" />}
+              title="Diff is on the roadmap"
+              body="Document diff is on the roadmap; it needs versioned document storage."
+            />
+          )}
+
+          {surface === 'explorer' && (
+            <EmptyState
+              icon={<IconLock className="ic lg" />}
+              title="Explorer is a Phase 2 destination"
+              body="Explorer is a Phase 2 destination — ships when a real Pack needs fact-relationship traversal."
+            />
           )}
         </section>
       </div>
+
       {isDeleteOpen && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-ink/45 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) setIsDeleteOpen(false); }}>
-          <section role="alertdialog" aria-modal="true" aria-labelledby="delete-session-title" aria-describedby="delete-session-copy" className="w-full max-w-md border-2 border-rule bg-ground p-5 shadow-lg" onKeyDown={(event) => { if (event.key === 'Escape') setIsDeleteOpen(false); }}>
-            <p className="eyebrow text-missing">Destructive action</p>
-            <h2 id="delete-session-title" className="display mt-1 text-[21px]">Delete this session?</h2>
-            <p id="delete-session-copy" className="mt-3 text-[13px] leading-relaxed text-ink-2">This removes “{title}” and its workspace history. This cannot be undone.</p>
-            <div className="mt-5 flex justify-end gap-2">
-              <ActionButton variant="secondary" onClick={() => setIsDeleteOpen(false)}>Cancel</ActionButton>
-              <ActionButton variant="danger" onClick={() => void deleteSessionAction(workspaceId, session.id)}>Delete session</ActionButton>
+        <div
+          className="overlay"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setIsDeleteOpen(false);
+          }}
+        >
+          <section
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-session-title"
+            aria-describedby="delete-session-copy"
+            className="modal"
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') setIsDeleteOpen(false);
+            }}
+          >
+            <div className="modal-hd">
+              <p className="eyebrow" style={{ color: 'var(--danger)' }}>Destructive action</p>
+              <h2 id="delete-session-title">Delete this session?</h2>
+            </div>
+            <div className="modal-bd">
+              <p id="delete-session-copy" className="cbd">This removes “{title}” and its workspace history. This cannot be undone.</p>
+            </div>
+            <div className="modal-ft">
+              <ActionButton variant="secondary" onClick={() => setIsDeleteOpen(false)}>
+                Cancel
+              </ActionButton>
+              <ActionButton variant="danger" onClick={() => void deleteSessionAction(workspaceId, session.id)}>
+                Delete session
+              </ActionButton>
             </div>
           </section>
         </div>
       )}
-    </main>
+    </section>
   );
 }

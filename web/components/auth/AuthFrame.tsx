@@ -1,41 +1,57 @@
 import type { ReactNode } from 'react';
+import { IconCheck, IconDoc, IconRefresh, IconSparkle, IconUser } from '@/lib/icons';
 
 /**
- * The sign-in frame — an instrument card, not a marketing fold. Left panel
- * carries the brand mark and the operational pitch; the right panel hosts the
- * form. Drops to a single, centered column on mobile.
+ * The reference auth shell: a dark brand panel (`.login-brand`) with an indigo
+ * grid/radial atmosphere, and a centered form card (`.login-side > .login-card`).
+ * Collapses to a single centered column on narrow viewports.
  */
-export function AuthFrame({ eyebrow, pitch, children }: { eyebrow: string; pitch: string; children: ReactNode }) {
+export function AuthFrame({ pitch, children }: { pitch: string; children: ReactNode }) {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-ground px-4 py-10">
-      <div className="w-full max-w-[900px] overflow-hidden border border-rule bg-surface shadow-sm">
-        <div className="grid md:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-          <aside className="hidden flex-col justify-between border-r border-rule bg-raised p-8 md:flex">
-            <div>
-              <div className="flex items-center gap-2.5">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center border border-rule bg-surface font-data text-[13px] font-bold text-accent">
-                  P
-                </span>
-                <div className="min-w-0">
-                  <p className="display text-[15px] leading-none text-ink">PaperMind</p>
-                  <p className="mt-1 font-data text-[9.5px] uppercase tracking-[0.18em] text-ink-3">{eyebrow}</p>
-                </div>
-              </div>
-              <p className="display mt-12 max-w-[220px] text-[22px] leading-snug text-ink">{pitch}</p>
-            </div>
-
-            <div className="space-y-1.5 border-t border-rule pt-4">
-              <p className="font-data text-[10px] uppercase tracking-[0.14em] text-ink-3">Operational note</p>
-              <p className="font-data text-[10px] leading-relaxed text-ink-3">
-                local draft — no real credentials
-                <br />
-                sign-in is mocked until the service lands
-              </p>
-            </div>
-          </aside>
-
-          <div className="p-6 sm:p-8">{children}</div>
+    <main className="login">
+      <aside className="login-brand">
+        <div className="brand">
+          <span className="brand-mark"><IconDoc className="ic sm" /></span>
+          <span className="brand-name">PaperMind</span>
         </div>
+        <div className="lb-hero">
+          <h1>{pitch}</h1>
+          <p>Document intelligence you can reuse — every extracted fact cites its source.</p>
+        </div>
+        <div className="lb-points">
+          <div className="lb-point">
+            <IconSparkle className="ic" />
+            <div>
+              <b>Author a Pack once</b>
+              <p>Describe the workflow; the studio drafts a spec you approve before anything runs.</p>
+            </div>
+          </div>
+          <div className="lb-point">
+            <IconCheck className="ic" />
+            <div>
+              <b>Evidence on every fact</b>
+              <p>Each extracted value is checked against a cited source span — no citation, no result.</p>
+            </div>
+          </div>
+          <div className="lb-point">
+            <IconRefresh className="ic" />
+            <div>
+              <b>Repeatable, versioned runs</b>
+              <p>The same Pack runs identically against any document set; versions never mutate in place.</p>
+            </div>
+          </div>
+        </div>
+        <div className="lb-demo" aria-hidden="true">
+          <div className="ld-hd">
+            <span>Dev demo</span>
+            <span className="pill warn">Development only</span>
+          </div>
+          <div className="ld-row"><IconUser className="ic sm" /> Email <span className="pill outl">ada@papermind.io</span></div>
+          <div className="ld-row"><IconDoc className="ic sm" /> Password <span className="pill outl">papermind123</span></div>
+        </div>
+      </aside>
+      <div className="login-side">
+        <div className="login-card">{children}</div>
       </div>
     </main>
   );

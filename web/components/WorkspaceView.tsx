@@ -1,148 +1,323 @@
 'use client';
 
 import Link from 'next/link';
+import { useState, type ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
 import type { WorkspaceDetailOut, WorkspaceSessionOut } from '@/lib/api';
-import { createSessionAction } from '@/lib/session';
-import { PageHeader, Button, CardKicker, CardTitle, Tag, Divider, EmptyState } from '@/components/ui';
+import { createSessionAction, deleteWorkspaceAction, updateWorkspaceAction } from '@/lib/session';
+import { ActionButton, Button, EmptyState, Input, PageHeader, Pill, Seg, Stat, Tag, type PillTone } from '@/components/ui';
+import {
+  IconAlert,
+  IconCheck,
+  IconChevronRight,
+  IconClock,
+  IconDoc,
+  IconLayers,
+  IconPlus,
+  IconRefresh,
+} from '@/lib/icons';
 
-/** A flush modular-grid stat cell — shared top rule, per-cell bottom rule, no box/shadow. Matches the prototype's stat strips (see app/page.tsx's local Stat). */
-function GridStat({ value, label }: { value: string | number; label: string }) {
+/** The statuses a workspace session actually carries (api.ts declares `status` as a
+ * loose string; this union is the closed set the backend emits). */
+type SessionStatus = 'draft' | 'pending' | 'running' | 'complete' | 'failed';
+
+const STATUS_TONE: Record<SessionStatus, PillTone> = {
+  draft: 'neutral',
+  pending: 'neutral',
+  running: 'running',
+  complete: 'verified',
+  failed: 'missing',
+};
+
+/** sess-ic tint + glyph per status. The CSS only ships `.done`/`.run`/`.warn`
+ * variants, so the dormant states (draft/pending) take a muted inline chip. */
+const STATUS_ICON: Record<SessionStatus, { icon: ReactNode; cls: string }> = {
+  draft: { icon: <IconClock className="ic sm" />, cls: '' },
+  pending: { icon: <IconClock className="ic sm" />, cls: '' },
+  running: { icon: <IconRefresh className="ic sm" />, cls: 'run' },
+  complete: { icon: <IconCheck className="ic sm" />, cls: 'done' },
+  failed: { icon: <IconAlert className="ic sm" />, cls: 'warn' },
+};
+
+function fmtDate(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function SessionRow({ session, workspaceId }: { session: WorkspaceSessionOut; workspaceId: string }) {
+  const status = session.status as SessionStatus;
+  const { icon, cls } = STATUS_ICON[status];
+  const neutral = cls === '';
+  const subject = session.subject?.trim() || 'No subject yet';
   return (
-    <div className="border-b border-r border-rule py-3.5 pl-3 first:pl-0">
-      <p className="display text-[24px] font-extrabold leading-none tabular-nums text-ink">{value}</p>
-      <p className="mt-1.5 text-[11px] text-ink-2">{label}</p>
-    </div>
+    <Link
+      href={`/workspace/${workspaceId}/sessions/${session.id}`}
+      className="sess-row"
+      style={{ textDecoration: 'none', color: 'inherit' }}
+      aria-label={`Open session ${session.title}`}
+    >
+      <span
+        className={`sess-ic ${cls}`.trim()}
+        style={neutral ? { background: 'var(--inset)', color: 'var(--ink-3)' } : undefined}
+      >
+        {icon}
+      </span>
+      <span className="sess-main">
+        <span className="sess-name">
+          {session.title}
+          {session.run_id && <span className="stamp">#{session.run_id.slice(0, 8)}</span>}
+        </span>
+        <span className="sess-sub">{subject}</span>
+      </span>
+      <span className="sess-flag">{fmtDate(session.updated_at)}</span>
+      <Pill tone={STATUS_TONE[status]} dot={status === 'running'}>
+        {status}
+      </Pill>
+      <span className="sess-chev">
+        <IconChevronRight className="ic sm" />
+      </span>
+    </Link>
   );
 }
 
-const sessionState: Record<WorkspaceSessionOut['status'], string> = {
-  draft: 'bg-raised text-ink-2',
-  pending: 'bg-raised text-ink-2',
-  running: 'bg-running-soft text-running',
-  complete: 'bg-verified-soft text-verified',
-  failed: 'bg-missing-soft text-missing',
-};
+/** The hidden-input form that posts `createSessionAction` — preserved verbatim in
+ * shape so a session is created and the user is redirected to it. */
+function NewSessionForm({ workspaceId, label = 'New session' }: { workspaceId: string; label?: string }) {
+  return (
+    <form action={createSessionAction.bind(null, workspaceId)}>
+      <input type="hidden" name="title" value="Untitled session" />
+      <ActionButton type="submit" variant="primary" icon={<IconPlus className="ic sm" />}>
+        {label}
+      </ActionButton>
+    </form>
+  );
+}
 
-export function WorkspaceView({ initial }: { initial: WorkspaceDetailOut }) {
+export function WorkspaceView({
+  initial,
+  verifiedRate,
+  issues,
+}: {
+  initial: WorkspaceDetailOut;
+  /** Verified-fact rate across this workspace's completed runs, if any. */
+  verifiedRate: number | null;
+  /** Non-verified facts (unsupported + missing) across completed runs. */
+  issues: number;
+}) {
+  const router = useRouter();
+  const [tab, setTab] = useState<'sessions' | 'rollup'>('sessions');
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [name, setName] = useState(initial.name);
+  const [goal, setGoal] = useState(initial.goal);
+  const [saving, setSaving] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const hasPack = Boolean(initial.pack_name);
-  const completed = initial.sessions.filter((session) => session.status === 'complete').length;
+  const completed = initial.sessions.filter((s) => s.status === 'complete').length;
+  const versionLabel = initial.pack_version !== null ? `v${initial.pack_version}` : 'Draft';
+
+  async function saveRename() {
+    const trimmed = name.trim();
+    if (!trimmed || saving) return;
+    setSaving(true);
+    await updateWorkspaceAction(initial.id, { name: trimmed, goal: goal.trim() });
+    setSaving(false);
+    setIsRenaming(false);
+    router.refresh();
+  }
 
   return (
-    <main className="min-h-full bg-ground text-ink">
+    <div className="page">
       <PageHeader
         eyebrow="Workspace"
         title={initial.name}
+        meta={
+          hasPack ? (
+            <>
+              <IconLayers className="ic sm" /> {initial.pack_name} {versionLabel} · one Pack per workspace, any
+              number of isolated sessions.
+            </>
+          ) : (
+            <>No Pack installed · one Pack per workspace, any number of isolated sessions.</>
+          )
+        }
         actions={
           <>
-            <Button href={`/workspace/${initial.id}/pack`} variant="secondary">{hasPack ? 'View pack' : 'Build a pack'}</Button>
-            <form action={createSessionAction.bind(null, initial.id)}>
-              <input type="hidden" name="title" value="Untitled session" />
-              <button type="submit" className="inline-flex items-center border border-accent bg-accent px-[14px] py-2 font-display text-[13.5px] font-extrabold text-accent-ink transition-colors hover:bg-accent-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2">
-                New session
-              </button>
-            </form>
+            {hasPack ? (
+              <>
+                <Button href={`/workspace/${initial.id}/pack`} variant="ghost" icon={<IconLayers className="ic sm" />}>
+                  View pack
+                </Button>
+                <NewSessionForm workspaceId={initial.id} />
+              </>
+            ) : (
+              <Button href={`/workspace/${initial.id}/pack`} variant="primary" icon={<IconPlus className="ic sm" />}>
+                Build a pack
+              </Button>
+            )}
+            <ActionButton variant="ghost" size="sm" onClick={() => setIsRenaming((v) => !v)}>
+              {isRenaming ? 'Cancel' : 'Rename'}
+            </ActionButton>
+            <ActionButton variant="danger" size="sm" onClick={() => setIsDeleteOpen(true)}>
+              Delete
+            </ActionButton>
           </>
         }
       />
 
-      {!hasPack ? (
-        <div className="mx-auto flex min-h-[calc(100dvh-145px)] max-w-2xl flex-col justify-center px-6 py-16">
-          <EmptyState
-            title="No Pack installed"
-            body="A Pack gives every session the same documents, instructions and outputs. Build one from a description or install a published Pack."
-            action={
-              <div className="flex flex-wrap justify-center gap-2">
-                <Button href={`/workspace/${initial.id}/pack`} variant="primary">Build a pack</Button>
-                <Button href="/marketplace" variant="secondary">Browse Marketplace</Button>
-              </div>
-            }
-          />
-          <div className="mt-12 border-t-2 border-rule pt-4 text-[12px] leading-relaxed text-ink-2">
-            You can prepare sessions now; runs become available after a Pack is installed. Every completed run remains comparable because it follows the same versioned workflow.
+      {isRenaming && (
+        <section className="card card-pad mt-4" style={{ maxWidth: 560 }}>
+          <Input label="Name" value={name} onChange={(v) => setName(v)} />
+          <div style={{ height: 14 }} />
+          <Input label="Goal" value={goal} onChange={(v) => setGoal(v)} />
+          <div className="flbl-wrap" style={{ marginTop: 14 }}>
+            <ActionButton variant="primary" onClick={() => void saveRename()} disabled={saving || !name.trim()}>
+              {saving ? 'Saving…' : 'Save changes'}
+            </ActionButton>
           </div>
-        </div>
+        </section>
+      )}
+
+      {!hasPack ? (
+        <EmptyState
+          icon={<IconLayers className="ic lg" />}
+          title="No Pack installed"
+          body="A Pack gives every session the same documents, instructions and outputs. Build one from a description or install a published Pack."
+          action={
+            <div className="flbl-wrap" style={{ justifyContent: 'center' }}>
+              <Button href={`/workspace/${initial.id}/pack`} variant="primary">
+                Build a pack
+              </Button>
+              <Button href="/marketplace" variant="secondary">
+                Browse Marketplace
+              </Button>
+            </div>
+          }
+        />
       ) : (
-        <div>
-          <section className="grid gap-6 border-b-2 border-rule px-4 py-7 sm:px-6 xl:grid-cols-[minmax(0,1fr)_300px]">
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <CardKicker>Installed pack</CardKicker>
-                <Tag variant="outline">{initial.pack_version !== null ? `v${initial.pack_version}` : 'Draft'}</Tag>
-              </div>
-              <CardTitle className="mt-2 text-[28px] text-accent">{initial.pack_name}</CardTitle>
-              <p className="mt-3 max-w-3xl text-[14px] leading-relaxed text-ink-2">{initial.goal}</p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Tag>Versioned workflow</Tag>
-                <Tag>Repeatable output</Tag>
-                <Tag>Audit ready</Tag>
-              </div>
-            </div>
-            <div className="border-l-0 border-rule xl:border-l xl:pl-6">
-              <CardKicker>Pack contents</CardKicker>
-              <div className="mt-3 divide-y divide-rule border-y border-rule">
-                {initial.assets.map((asset) => (
-                  <div key={asset.id} className="py-2.5">
-                    <p className="truncate font-data text-[12px]">{asset.name}</p>
-                  </div>
-                ))}
-                {initial.assets.length === 0 && <p className="py-2.5 text-[12px] text-ink-2">No assets attached.</p>}
-              </div>
-            </div>
+        <>
+          <section className="card stats" aria-label="Workspace statistics">
+            <Stat bare label="Sessions" value={initial.session_count} sub={`${completed} completed`} />
+            <Stat bare label="Documents" value={initial.assets.length} sub="in the Pack" />
+            <Stat
+              bare
+              label="Verified rate"
+              value={verifiedRate !== null ? `${verifiedRate}%` : '—'}
+              tone={verifiedRate !== null ? 'verified' : 'default'}
+              sub={verifiedRate !== null ? 'cited facts across runs' : 'no completed runs yet'}
+            />
+            <Stat bare label="Open issues" value={issues} sub="unsupported or missing facts" tone={issues > 0 ? 'missing' : 'default'} />
           </section>
 
-          <section className="mx-4 mt-[18px] grid grid-cols-2 border-l border-t border-rule sm:mx-6 sm:grid-cols-5">
-            <GridStat label="Version" value={initial.pack_version !== null ? `v${initial.pack_version}` : 'Draft'} />
-            <GridStat label="Completed" value={completed} />
-            <GridStat label="Assets" value={initial.assets.length} />
-            <GridStat label="Sessions" value={initial.session_count} />
-            <GridStat label="Visibility" value="Private" />
-          </section>
+          <div className="sec-head">
+            <Seg
+              options={[
+                { value: 'sessions', label: 'Sessions' },
+                { value: 'rollup', label: 'Rollup' },
+              ]}
+              value={tab}
+              onChange={setTab}
+            />
+          </div>
 
-          <section className="px-4 py-7 sm:px-6">
-            <div>
-              <CardKicker>Sessions</CardKicker>
-              <div className="mt-4 divide-y divide-rule border-y border-rule">
-                {initial.sessions.map((session) => (
-                  <Link
-                    key={session.id}
-                    href={`/workspace/${initial.id}/sessions/${session.id}`}
-                    className="flex items-center gap-3 py-3 transition-colors hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                  >
-                    <span className={`h-2 w-2 rounded-full ${sessionState[session.status] ?? 'bg-raised text-ink-2'}`} />
-                    <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{session.title}</span>
-                    <span className="font-data text-[10px] text-ink-3">{session.status}</span>
-                  </Link>
-                ))}
-                {initial.sessions.length === 0 && <p className="py-5 text-[12px] text-ink-2">No sessions yet.</p>}
-              </div>
-              <form action={createSessionAction.bind(null, initial.id)} className="mt-4 flex gap-2">
-                <label className="sr-only" htmlFor="session-title">Session title</label>
-                <input
-                  id="session-title"
-                  name="title"
-                  type="text"
-                  placeholder="New session title"
-                  required
-                  className="w-full border border-rule bg-surface px-2.5 py-1.5 text-[13px] text-ink outline-none placeholder:text-ink-3 focus:border-accent"
+          {tab === 'sessions' ? (
+            <div className="wk-grid">
+              {initial.sessions.length === 0 ? (
+                <EmptyState
+                  icon={<IconClock className="ic lg" />}
+                  title="No sessions yet"
+                  body="Start a session to run this Pack against your documents."
+                  action={<NewSessionForm workspaceId={initial.id} />}
                 />
-                <button
-                  type="submit"
-                  className="inline-flex items-center gap-1.5 border border-accent bg-accent px-3 py-1.5 text-[13px] font-medium text-accent-ink transition-all hover:brightness-110"
-                >
-                  Add session
-                </button>
-              </form>
-            </div>
-          </section>
+              ) : (
+                <div className="card" style={{ padding: 0 }}>
+                  <div className="card-hd">
+                    <h3>Sessions</h3>
+                    <span className="chd-count">{initial.sessions.length}</span>
+                  </div>
+                  <div className="sess-thead" role="row" aria-hidden="true">
+                    <span />
+                    <span>Session</span>
+                    <span>Updated</span>
+                    <span>Status</span>
+                    <span />
+                  </div>
+                  <div className="sess-list">
+                    {initial.sessions.map((session) => (
+                      <SessionRow key={session.id} session={session} workspaceId={initial.id} />
+                    ))}
+                  </div>
+                </div>
+              )}
 
-          <Divider />
-          <section className="mx-4 my-6 grid grid-cols-2 border-l border-t-2 border-rule sm:mx-6 md:grid-cols-3">
-            <GridStat label="Sessions run" value={initial.session_count} />
-            <GridStat label="Completed" value={completed} />
-            <GridStat label="Assets attached" value={initial.assets.length} />
+              <aside className="rail">
+                <div className="card">
+                  <div className="card-hd">
+                    <h3>Installed Pack</h3>
+                    <Tag variant="accent">{versionLabel}</Tag>
+                  </div>
+                  <div className="pack-body">
+                    <p className="pack-name">{initial.pack_name}</p>
+                    <p className="fineprint" style={{ marginTop: 5 }}>
+                      {initial.goal}
+                    </p>
+                    <ul className="pack-facts">
+                      {initial.assets.map((asset) => (
+                        <li key={asset.id}>
+                          <IconDoc className="ic sm" /> {asset.name}
+                        </li>
+                      ))}
+                      {initial.assets.length === 0 && <li className="muted">No assets attached.</li>}
+                    </ul>
+                    <div style={{ marginTop: 12 }}>
+                      <Button href={`/workspace/${initial.id}/pack`} variant="secondary" className="wfull">
+                        Open in Pack Studio
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </aside>
+            </div>
+          ) : (
+            <div className="card">
+              <div className="card-pad">
+                <p className="fineprint">
+                  Rollup aggregates across the portfolio; it ships once multiple sessions exist.
+                </p>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {isDeleteOpen && (
+        <div
+          className="overlay"
+          style={{ position: 'fixed', inset: 0, zIndex: 90, display: 'grid', placeItems: 'center', padding: 16 }}
+          onMouseDown={(event) => { if (event.target === event.currentTarget) setIsDeleteOpen(false); }}
+        >
+          <section
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-ws-title"
+            aria-describedby="delete-ws-copy"
+            className="modal"
+            onKeyDown={(event) => { if (event.key === 'Escape') setIsDeleteOpen(false); }}
+          >
+            <div className="modal-hd">
+              <p className="eyebrow" style={{ color: 'var(--danger)' }}>Destructive action</p>
+              <h2 id="delete-ws-title">Delete this workspace?</h2>
+            </div>
+            <div className="modal-bd">
+              <p id="delete-ws-copy" className="cbd">
+                This permanently removes “{initial.name}”, its sessions and runs. This cannot be undone.
+              </p>
+            </div>
+            <div className="modal-ft" style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <ActionButton variant="secondary" onClick={() => setIsDeleteOpen(false)}>Cancel</ActionButton>
+              <ActionButton variant="danger" onClick={() => void deleteWorkspaceAction(initial.id)}>Delete workspace</ActionButton>
+            </div>
           </section>
         </div>
       )}
-    </main>
+    </div>
   );
 }

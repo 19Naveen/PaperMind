@@ -13,8 +13,8 @@ import io
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.services.llm import get_providers
 from app.models import Chunk, Document
+from app.services.llm import get_providers
 
 PAGE_BREAK = "\n\n"
 CHUNK_SIZE = 900

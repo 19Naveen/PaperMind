@@ -9,8 +9,8 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.api.v1.routers.documents import router as documents_router
-from app.api.v1.routers.packs import router as packs_router
+from app.api.routers.documents import router as documents_router
+from app.api.routers.packs import router as packs_router
 from app.core.errors import install_error_handlers
 
 

@@ -23,19 +23,35 @@ import {
   createStudioSession,
   createWorkspace,
   createWorkspaceSession,
+  decideGovernanceReview,
+  deleteWorkspace,
   deleteWorkspaceSession,
   fieldErrors,
   installWorkspacePack,
+  listStudioRevisions,
   login,
   logout,
+  promotePackRelease,
+  restorePackRelease,
   runSession,
   signup,
+  studioPreview,
+  submitGovernanceReview,
   updateMe,
+  updateWorkspace,
   updateWorkspaceSession,
   uploadDocument,
   apiFetch,
 } from './api';
-import type { DocumentOut } from './api';
+import type {
+  DocumentOut,
+  GovernanceDecisionOut,
+  PackReleaseOut,
+  PackReviewOut,
+  ReleaseEnvironment,
+  StudioDraftRevisionOut,
+  StudioPreviewOut,
+} from './api';
 
 export interface AuthFailure {
   code: string;
@@ -89,9 +105,10 @@ export async function signUpAction(
   redirect('/');
 }
 
-/** Creates a workspace and opens it. Thrown ApiErrors surface as the Next.js error boundary. */
-export async function createWorkspaceAction(name: string, goal: string): Promise<never> {
+/** Creates a workspace, optionally installing a chosen Pack into it, and opens it. */
+export async function createWorkspaceAction(name: string, goal: string, packId?: string): Promise<never> {
   const workspace = await createWorkspace(name, goal);
+  if (packId) await installWorkspacePack(workspace.id, packId);
   redirect(`/workspace/${workspace.id}`);
 }
 
@@ -137,6 +154,23 @@ export async function installPackAction(workspaceId: string, packId: string): Pr
   await installWorkspacePack(workspaceId, packId);
   revalidatePath('/marketplace');
   revalidatePath(`/workspace/${workspaceId}`);
+}
+
+/** Edits a workspace's name/goal in place. */
+export async function updateWorkspaceAction(
+  workspaceId: string,
+  patch: { name?: string; goal?: string },
+): Promise<void> {
+  await updateWorkspace(workspaceId, patch);
+  revalidatePath(`/workspace/${workspaceId}`);
+  revalidatePath('/');
+}
+
+/** Deletes a workspace after an explicit client-side confirmation, then returns home. */
+export async function deleteWorkspaceAction(workspaceId: string): Promise<never> {
+  await deleteWorkspace(workspaceId);
+  revalidatePath('/');
+  redirect('/');
 }
 
 /** Edits a session's title/subject in place. */
@@ -211,9 +245,131 @@ export async function approveAndInstallAction(
 }
 
 /** Creates the studio conversation a workspace's pack page authors against. */
-export async function createStudioSessionAction(title: string): Promise<string> {
-  const session = await createStudioSession(title);
+export async function createStudioSessionAction(input: {
+  title: string;
+  workspaceId?: string;
+  packId?: string;
+  basePackVersionId?: string;
+}): Promise<string> {
+  const session = await createStudioSession({
+    title: input.title,
+    workspace_id: input.workspaceId ?? null,
+    pack_id: input.packId ?? null,
+    base_pack_version_id: input.basePackVersionId ?? null,
+  });
   return session.id;
+}
+
+/** Approves the studio draft as a NEW frozen version of an existing Pack (append-only
+ * editing) and returns to the pack's detail page. */
+export async function approveNewVersionAction(
+  packId: string,
+  studioSessionId: string,
+  backTo: string,
+): Promise<never> {
+  await approvePackVersion(packId, studioSessionId);
+  revalidatePath('/marketplace');
+  revalidatePath(`/marketplace/${packId}`);
+  redirect(backTo);
+}
+
+// ---------------------------------------------------- studio revision lifecycle
+
+/** Lists a studio session's draft revisions (newest first) so a reload can hydrate the
+ * current workflow / diff / validation. */
+export async function listStudioRevisionsAction(sessionId: string): Promise<StudioDraftRevisionOut[]> {
+  return listStudioRevisions(sessionId);
+}
+
+/** Uniform outcome of an inline-feedback action: real data on success, or a stable
+ * `code` + `message` pair on a controlled API failure (no redirect, no thrown error). */
+export type StudioActionOutcome<T> =
+  | { ok: true; data: T }
+  | { ok: false; code: string; message: string };
+
+async function studioAction<T>(fn: () => Promise<T>): Promise<StudioActionOutcome<T>> {
+  try {
+    return { ok: true, data: await fn() };
+  } catch (error) {
+    if (error instanceof ApiError) return { ok: false, code: error.code, message: error.message };
+    throw error;
+  }
+}
+
+/** Dry-run the studio draft against documents. Returns real preview facts, or the API's
+ * honest error (e.g. no draft yet, no documents selected). */
+export async function studioPreviewAction(
+  sessionId: string,
+  documentIds: string[],
+): Promise<StudioActionOutcome<StudioPreviewOut>> {
+  return studioAction(() => studioPreview(sessionId, documentIds));
+}
+
+// ---------------------------------------------------- governance / release lifecycle
+
+/** Submit a draft revision for governance review. Inline feedback; the marketplace page
+ * revalidates so the pending review appears. */
+export async function submitReviewAction(
+  packId: string,
+  revisionId: string,
+): Promise<StudioActionOutcome<PackReviewOut>> {
+  try {
+    const review = await submitGovernanceReview(packId, revisionId);
+    revalidatePath(`/marketplace/${packId}`);
+    revalidatePath('/marketplace');
+    return { ok: true, data: review };
+  } catch (error) {
+    if (error instanceof ApiError) return { ok: false, code: error.code, message: error.message };
+    throw error;
+  }
+}
+
+/** Approve or reject a pending review. Approval freezes a new immutable version. */
+export async function decideReviewAction(
+  packId: string,
+  reviewId: string,
+  approve: boolean,
+): Promise<StudioActionOutcome<GovernanceDecisionOut>> {
+  try {
+    const outcome = await decideGovernanceReview(reviewId, approve);
+    revalidatePath(`/marketplace/${packId}`);
+    return { ok: true, data: outcome };
+  } catch (error) {
+    if (error instanceof ApiError) return { ok: false, code: error.code, message: error.message };
+    throw error;
+  }
+}
+
+/** Promote a frozen version into an environment (development → staging → production).
+ * The API enforces the forward-only ordering; its message is surfaced inline. */
+export async function promoteReleaseAction(
+  packId: string,
+  packVersionId: string,
+  environment: ReleaseEnvironment,
+): Promise<StudioActionOutcome<PackReleaseOut>> {
+  try {
+    const release = await promotePackRelease(packId, packVersionId, environment);
+    revalidatePath(`/marketplace/${packId}`);
+    return { ok: true, data: release };
+  } catch (error) {
+    if (error instanceof ApiError) return { ok: false, code: error.code, message: error.message };
+    throw error;
+  }
+}
+
+/** Forward-only restore of a historical release into its environment. */
+export async function restoreReleaseAction(
+  packId: string,
+  releaseId: string,
+): Promise<StudioActionOutcome<PackReleaseOut>> {
+  try {
+    const release = await restorePackRelease(releaseId);
+    revalidatePath(`/marketplace/${packId}`);
+    return { ok: true, data: release };
+  } catch (error) {
+    if (error instanceof ApiError) return { ok: false, code: error.code, message: error.message };
+    throw error;
+  }
 }
 
 export async function signOutAction(): Promise<void> {

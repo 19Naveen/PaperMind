@@ -13,11 +13,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from typing import cast
 
 from app.core.config import Settings, get_settings
+
+_logger = logging.getLogger(__name__)
 
 # JSON Schema subset both a structured call and the extractor produce against.
 JSON_SCHEMA = dict[str, object]
@@ -214,7 +217,17 @@ def _make_llm(s: Settings) -> LLMProvider:
 
 def _make_embedder(s: Settings) -> Embedder:
     if s.embedding_provider == "sentence-transformers":
-        return SentenceTransformerEmbedder(s)
+        try:
+            return SentenceTransformerEmbedder(s)
+        except ModuleNotFoundError:
+            # Embeddings are optional (pyproject: "guarded imports"); without the
+            # package the app must still boot — LLM features (studio, runs) do not
+            # need embeddings. Retrieval degrades to the deterministic fake embedder.
+            _logger.warning(
+                "sentence-transformers is not installed; using FakeEmbedder. "
+                "Install it for real retrieval embeddings."
+            )
+            return FakeEmbedder(s.embedding_dim)
     if s.embedding_provider == "gemini":
         return GeminiEmbedder(s)
     if s.embedding_provider == "fake":

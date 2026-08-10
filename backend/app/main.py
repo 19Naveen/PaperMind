@@ -3,12 +3,13 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1.routers.auth import router as auth_router
-from app.api.v1.routers.documents import router as documents_router
-from app.api.v1.routers.packs import router as packs_router
-from app.api.v1.routers.runs import router as runs_router
-from app.api.v1.routers.studio import router as studio_router
-from app.api.v1.routers.workspaces import router as workspaces_router
+from app.api.routers.auth import router as auth_router
+from app.api.routers.documents import router as documents_router
+from app.api.routers.governance import router as governance_router
+from app.api.routers.packs import router as packs_router
+from app.api.routers.runs import router as runs_router
+from app.api.routers.studio import router as studio_router
+from app.api.routers.workspaces import router as workspaces_router
 from app.core.config import get_settings
 from app.core.errors import install_error_handlers
 
@@ -36,6 +37,7 @@ app.include_router(packs_router)
 app.include_router(documents_router)
 app.include_router(runs_router)
 app.include_router(studio_router)
+app.include_router(governance_router)
 
 
 @app.get("/healthz")

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Response
 from sqlalchemy import select
 
 import app.schemas as s
-from app.api.deps import CurrentUser, DB
+from app.api.deps import DB, CurrentUser
 from app.core.errors import ApiError, Code
 from app.core.security import (
     clear_session_cookie,

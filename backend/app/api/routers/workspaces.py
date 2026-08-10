@@ -14,12 +14,11 @@ from typing import Annotated
 from fastapi import APIRouter, BackgroundTasks, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy import Select, func, select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 import app.schemas as s
-from app.api.deps import CurrentUser
-from app.core.db import DB
+from app.api.deps import DB, CurrentUser
+from app.api.routers.runs import create_run_rows, run_task, serialize_run
 from app.core.errors import ApiError, Code
 from app.models import (
     Chunk,
@@ -31,7 +30,7 @@ from app.models import (
     Workspace,
     WorkspaceSession,
 )
-from app.api.v1.routers.runs import create_run_rows, run_task, serialize_run
+from app.services import releases as releases_svc
 from app.services.llm import get_providers
 from app.services.retrieval import search
 
@@ -85,6 +84,7 @@ def _out(row: WorkspaceRow) -> s.WorkspaceOut:
         pack_version=pack_version,
         session_count=session_count,
         updated_at=workspace.updated_at,
+        environment=workspace.environment,
     )
 
 
@@ -150,7 +150,9 @@ def list_workspaces(
 
 @router.post("", response_model=s.WorkspaceOut, status_code=201)
 def create_workspace(body: s.WorkspaceCreate, user: CurrentUser, db: DB) -> s.WorkspaceOut:
-    workspace = Workspace(owner_id=user.id, name=body.name, goal=body.goal)
+    workspace = Workspace(
+        owner_id=user.id, name=body.name, goal=body.goal, environment=body.environment
+    )
     db.add(workspace)
     db.commit()
     return _out((workspace, None, None, 0))
@@ -372,11 +374,23 @@ def run_session(
             "The installed Pack has no frozen version yet — approve one first.",
             status=409,
         )
+    # Environment-aware release resolution: when the workspace's environment has an
+    # active release, the run pins that release's version and records the release_id.
+    # Without one (pre-lifecycle workspaces) it falls back to the latest version.
+    release = releases_svc.active_release_for(db, workspace.pack_id, workspace.environment)
+    run_version = pv
+    if release is not None:
+        pinned = db.get(PackVersion, release.pack_version_id)
+        if pinned is not None:
+            run_version = pinned
     run = create_run_rows(
         db,
-        pv.id,
+        run_version.id,
         [s.RunCaseIn(subject=session.subject or session.title, document_ids=body.document_ids)],
     )
+    if release is not None:
+        run.release_id = release.id
+        db.commit()
     session.run_id = run.id
     session.status = "pending"
     db.commit()
@@ -388,9 +402,8 @@ def run_session(
 def install_pack(
     workspace_id: uuid.UUID, body: s.WorkspacePackInstall, user: CurrentUser, db: DB
 ) -> s.WorkspaceOut:
-    """Claim a Pack for this workspace. The 1:1 Workspace→Pack rule is a UNIQUE on
-    pack_id; the IntegrityError branch covers the race of two workspaces claiming the
-    same Pack at once."""
+    """Claim a Pack for this workspace. One Pack per workspace; a published Pack is a
+    shared artifact any number of workspaces may install (versions are frozen)."""
     workspace = _owned(db, user, workspace_id)
     pack = db.get(Pack, body.pack_id)
     if pack is None:
@@ -401,14 +414,7 @@ def install_pack(
             "This workspace already has a Pack. Remove it before installing another.",
             status=409,
         )
-    try:
-        workspace.pack_id = pack.id
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        raise ApiError(
-            Code.WORKSPACE_PACK_TAKEN,
-            "This workspace already has a Pack. Remove it before installing another.",
-            status=409,
-        ) from None
+    workspace.pack_id = pack.id
+    # The audit row commits the pending workspace change too (same session/transaction).
+    releases_svc.record_audit(db, pack_id=pack.id, event_type="pack_installed", actor_id=user.id)
     return _out(_owned_row(db, user, workspace_id))

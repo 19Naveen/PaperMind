@@ -9,8 +9,8 @@ import uuid
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from app.services.llm import get_providers
 from app.models import Chunk
+from app.services.llm import get_providers
 
 RRF_K = 60
 TOP_K = 8

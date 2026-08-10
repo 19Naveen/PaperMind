@@ -181,10 +181,10 @@ Navigate verified facts and their relationships — built entirely on facts that
                               PaperMind
 
 ┌────────────────────────────────────────────────────────────┐
-│                        Product Layer                        │
+│                        Product Layer                         │
 │                                                              │
-│   Pack Studio · Checklist · Grid · Rollups · Diff · Explorer │
-│   · Reports                                                  │
+│   Pack Studio · Marketplace · Workspace · Session ·          │
+│   Checklist surface (Grid/Rollup/Diff/Explorer: roadmap)     │
 └────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -202,16 +202,17 @@ Navigate verified facts and their relationships — built entirely on facts that
 ┌────────────────────────────────────────────────────────────┐
 │                      Capability Layer                        │
 │                                                              │
-│   Search · Extraction · Verification · Classification ·       │
-│   Relationship Analysis · Computation · Vision · Reporting     │
+│   Hybrid Retrieval · Structured Extraction · Quote           │
+│   Verification · Classification · Reporting                  │
+│   (Relationship analysis · computation · vision: roadmap)     │
 └────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌────────────────────────────────────────────────────────────┐
 │                    Infrastructure Layer                      │
 │                                                              │
-│   PostgreSQL · OpenSearch · Object Storage ·                  │
-│   Graph Engine (Phase 2) · Python Sandbox (Phase 2)           │
+│   PostgreSQL + pgvector (shipped) · local blob storage        │
+│   OpenSearch · S3 · Graph Engine · sandbox (roadmap)          │
 └────────────────────────────────────────────────────────────┘
 ```
 
@@ -297,34 +298,35 @@ Produces the requested output: checklist, grid, rollup, or executive summary —
 
 ## Storage Model
 
-| Store | Holds |
-|---|---|
-| **PostgreSQL** | Users, organizations, Packs, Pack versions, execution runs, extracted facts, citations, reports |
-| **OpenSearch** | Embeddings, BM25 index, metadata index for hybrid retrieval |
-| **Object Storage (S3-compatible)** | Original uploaded documents, images, generated reports and files |
-| **Graph Engine** *(Phase 2)* | Verified relationships only — never raw, unverified LLM output |
+| Store | Holds | Status |
+|---|---|---|
+| **PostgreSQL** (+ `pgvector`) | Users, Packs, immutable Pack versions, workspaces, sessions, runs, facts, citations, studio sessions | Shipped |
+| **Local disk** (`backend/storage`) | Uploaded document blobs | Shipped — swap point for S3-compatible storage when needed |
+| **OpenSearch** | Dedicated BM25/vector index | Roadmap — hybrid retrieval is served from Postgres today (`pgvector` cosine + `ts_rank`, RRF merge) |
+| **Object Storage (S3-compatible)** | Document blobs at scale | Roadmap — MinIO/S3 behind the existing `storage` swap point |
+| **Graph Engine** | Verified-fact relationships | Roadmap (Phase 2+) — never raw, unverified LLM output |
 
 ---
 
 ## Technology Stack
 
 **Frontend**
-Next.js 16 (App Router, React 19) · TypeScript · Tailwind CSS v4 · a local component library ("Modernist" design system) — no UI framework dependency
+Next.js 16 (App Router, React 19) · TypeScript · Tailwind CSS v4 · a local component library ("Modernist" design system) · `@xyflow/react` for the Pack Studio canvas
 
 **Backend**
-FastAPI · SQLAlchemy 2.0 · Alembic · Pydantic v2 · `uv`
+FastAPI · SQLAlchemy 2.0 (typed) · Alembic · Pydantic v2 · `uv`
 
 **AI**
-LangChain (authoring orchestration) · LLM provider abstraction layer
+LLM + embedding provider abstraction (`app/services/llm.py`) — Google Gemini (real) and deterministic `fake` providers (offline/tests). Authoring uses the LLM; the runtime uses it only for the extraction/classification steps a Pack defines.
 
-**Search**
-OpenSearch · BM25 · Vector Search · Reciprocal Rank Fusion · Reranker
+**Search / Retrieval**
+Hybrid retrieval in Postgres: `pgvector` cosine + `ts_rank` full-text, merged with Reciprocal Rank Fusion. A dedicated search index (OpenSearch) is a roadmap swap point, not a current dependency.
 
 **Database**
-PostgreSQL
+PostgreSQL with the `pgvector` extension
 
 **Storage**
-MinIO / S3-compatible object storage
+Local filesystem today (`backend/storage`); S3-compatible object storage is the named swap point for multi-host deployments.
 
 ---
 
@@ -368,12 +370,25 @@ make frontend-lint frontend-typecheck frontend-build
 
 | Area | State |
 |---|---|
-| Frontend UI | Complete across Home, Marketplace, Workspace, Pack builder, Session, and account screens — wired to the FastAPI backend through `web/lib/api.ts` |
-| Backend | Workspaces, Packs, Sessions, documents, runs, and the six-stage runtime built; see `backend/README.md` |
+| Frontend | Complete across Home, Marketplace (grid + pack detail + install + edit), Workspace, Pack Studio, Session, New-workspace wizard, and account screens — wired to the FastAPI backend through `web/lib/api.ts` |
+| Backend | Workspaces, Packs, Sessions, documents, runs, the six-stage runtime, and the Pack Studio built; see `backend/README.md` |
 | Auth | Real signup/login against the backend; httpOnly session cookie proxied through the Next.js server layer |
+| Marketplace | Shipped — publish a Pack, browse/search, open a pack detail page, install into a workspace, and edit a published Pack to author a new version |
+| Packs | A published Pack may be installed in many workspaces (one Pack per workspace); versions are immutable and runs pin the exact version |
 | Product surfaces | The **Checklist** surface is the Phase 1 target. Grid, Rollup, Diff, and Explorer are described below as the design destination, not as shipped features |
 
 The frontend is organised around the **Workspace → Pack → Session** model: a workspace holds exactly one Pack, and each session is an isolated execution of it. See [`web/README.md`](./web/README.md) for the frontend architecture and design-system rules.
+
+### Enterprise Pack engine
+
+The Pack engine is upgraded from a fixed six-stage pipeline into a versioned, executable workflow with a review/release lifecycle. **The backend is built and tested (97 tests).** The engine's frontend authoring UI (revisions/diff/validation/test/review panes, release console) is deferred.
+
+- **Canonical workflow contract** (`WorkflowSpecV1`, `app/services/workflow_contract.py`) — an explicit, typed, validated DAG with node kinds (`classify_documents`, `retrieve_evidence`, `extract_field`, `verify_field`, `evaluate_rule`, `render_checklist`), typed ports, restricted conditional edges, retry/timeout/failure policies, and a checklist output contract. Legacy Packs adapt deterministically to it; existing immutable `pack_versions` rows are never mutated.
+- **AI Studio revisions** (`app/services/studio.py` + `app/repositories/studio.py`) — each authoring turn produces an immutable draft revision with a deterministic diff and validation report, seeded from the latest frozen version when editing.
+- **Executable DAG runtime** (`app/services/workflow_runtime.py` + `app/repositories/runs.py`) — compiles and executes the Pack's own topology (branching, retries, timeouts, per-node failure policy) while reusing the existing evidence/verification guarantees, with append-only per-node attempt telemetry and a dry-run preview.
+- **Review, audit, environments** (`app/services/releases.py` + `app/repositories/releases.py`) — submit-for-review → approve → development → staging → production promotion, immutable audit trail, forward-only rollback/restore, and environment-aware run resolution (runs pin the active release).
+
+Deliberately deferred: RBAC/organisations, arbitrary code/HTTP nodes, loops, distributed workers, a connector marketplace, and the engine's frontend authoring UI.
 
 ---
 
@@ -408,6 +423,8 @@ The frontend is organised around the **Workspace → Pack → Session** model: a
 - Pack discovery and search
 - Ratings and reviews
 - Verified publishers
+
+> **Marketplace basics have shipped** as part of the current focus: authoring and approving a Pack, browsing/searching the catalogue, a pack detail page, installing into a workspace, and editing a published Pack to author a new version. The collaboration and community items below (import/export, private sharing, teams, organisations, public registry, ratings) remain roadmap.
 
 **Phases 2 through 4 are intentionally not built yet.** Each is gated behind evidence from real Packs — see below.
 

@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 import app.schemas as s
-from app.core.db import DB
+from app.api.deps import DB
 from app.core.errors import ApiError, Code
 from app.models import (
     Case,
@@ -23,6 +23,7 @@ from app.models import (
     Run,
     RunDocument,
 )
+from app.repositories import runs as runs_repo
 from app.services.llm import get_providers
 from app.services.runtime import execute_run
 
@@ -64,6 +65,7 @@ def serialize_run(run: Run) -> s.RunOut:
         status=run.status,
         stage=run.stage,
         started_at=run.started_at,
+        release_id=run.release_id,
         cases=[s.Case(id=c.id, subject=c.subject) for c in run.cases],
         documents=[
             s.RunDocument(
@@ -144,6 +146,30 @@ def create_run(body: s.RunCreate, background: BackgroundTasks, db: DB) -> s.RunO
 def get_run(run_id: uuid.UUID, db: DB) -> s.RunOut:
     run = load_run(db, run_id)
     return serialize_run(run)
+
+
+@router.get("/{run_id}/attempts", response_model=list[s.RunNodeAttemptOut])
+def get_run_attempts(run_id: uuid.UUID, db: DB) -> list[s.RunNodeAttemptOut]:
+    """DAG node-attempt telemetry for a run, oldest first. Consistent with the other
+    run endpoints (no ownership check — the run id is the capability)."""
+    if db.get(Run, run_id) is None:
+        raise ApiError(Code.RUN_NOT_FOUND, "Run not found.", 404)
+    return [
+        s.RunNodeAttemptOut(
+            id=a.id,
+            run_id=a.run_id,
+            node_id=a.node_id,
+            attempt_no=a.attempt_no,
+            status=a.status,
+            started_at=a.started_at,
+            finished_at=a.finished_at,
+            branch_reason=a.branch_reason,
+            error_code=a.error_code,
+            error_message=a.error_message,
+            output_digest=a.output_digest,
+        )
+        for a in runs_repo.list_attempts(db, run_id)
+    ]
 
 
 @router.post("/{run_id}/corrections", response_model=s.CorrectionOut, status_code=201)

@@ -225,6 +225,12 @@ export interface PackOut {
   name: string;
   latest_version: number;
   updated_at: string;
+  /** How many workspaces have claimed this Pack (marketplace popularity). */
+  installs: number;
+  /** Shape of the latest frozen version — what the Pack reviews and extracts. */
+  document_types: string[];
+  field_names: string[];
+  rule_count: number;
 }
 
 export interface PackVersionOut {
@@ -232,6 +238,8 @@ export interface PackVersionOut {
   version: number;
   created_at: string;
   spec: PackSpec;
+  /** 1+ for canonical workflow versions; null for legacy pre-contract specs. */
+  contract_version?: number | null;
 }
 
 export interface PackDetailOut {
@@ -241,6 +249,28 @@ export interface PackDetailOut {
 
 // ---------------------------------------------------------------------- studio
 
+/** Revision-lifecycle fields of a studio session. `current_revision` is the subset of
+ * `StudioDraftRevisionOut` the session-summary endpoint returns (it omits the ids/audit
+ * columns — the full row comes from the revisions endpoints). */
+export interface StudioCurrentRevision {
+  revision_no: number;
+  digest: string;
+  validation: ValidationResult;
+  diff: DiffEntry[];
+  workflow: WorkflowSpecV1;
+}
+
+export interface StudioTurnOut {
+  id: string;
+  session_id: string;
+  role: string;
+  content: string;
+  model_id: string | null;
+  status: string;
+  revision_id: string | null;
+  created_at: string;
+}
+
 export interface StudioSessionOut {
   id: string;
   pack_id: string | null;
@@ -248,6 +278,94 @@ export interface StudioSessionOut {
   status: string;
   draft: PackSpec | null;
   created_at: string;
+  workspace_id?: string | null;
+  created_by_id?: string | null;
+  base_pack_version_id?: string | null;
+  current_revision?: StudioCurrentRevision | null;
+  turns?: StudioTurnOut[];
+}
+
+export interface StudioSessionCreate {
+  title?: string;
+  workspace_id?: string | null;
+  pack_id?: string | null;
+  base_pack_version_id?: string | null;
+}
+
+/** A persisted draft revision: the canonical workflow plus its diff vs the parent and
+ * its validation result. Mirrors backend `StudioDraftRevisionOut`. */
+export interface StudioDraftRevisionOut {
+  id: string;
+  session_id: string;
+  revision_no: number;
+  parent_id: string | null;
+  workflow: WorkflowSpecV1;
+  diff: DiffEntry[];
+  validation: ValidationResult;
+  digest: string;
+  model_id: string | null;
+  created_by_id: string | null;
+  created_at: string;
+}
+
+export interface StudioPreviewFact {
+  field: string;
+  value: string | null;
+  state: FactState;
+  citations: Citation[];
+}
+
+export interface StudioPreviewOut {
+  spec: PackSpec;
+  facts: StudioPreviewFact[];
+}
+
+// ---------------------------------------------------------------- governance
+
+/** A governance review of one draft revision. `state` is pending until decided. */
+export interface PackReviewOut {
+  id: string;
+  pack_id: string;
+  revision_id: string | null;
+  submitted_by: string | null;
+  submitted_at: string;
+  approved_by: string | null;
+  approved_at: string | null;
+  state: 'pending' | 'approved' | 'rejected';
+  validation_digest: string | null;
+}
+
+export type ReleaseEnvironment = 'development' | 'staging' | 'production';
+
+/** One release action (promote/restore/install…) of a pack version into an environment. */
+export interface PackReleaseOut {
+  id: string;
+  pack_id: string;
+  pack_version_id: string;
+  environment: ReleaseEnvironment;
+  action: string;
+  source_release_id: string | null;
+  restored_from_release_id: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface PackAuditEventOut {
+  id: string;
+  pack_id: string;
+  event_type: string;
+  actor_id: string | null;
+  revision_id: string | null;
+  version_id: string | null;
+  release_id: string | null;
+  environment: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface GovernanceDecisionOut {
+  review: PackReviewOut;
+  version: PackVersionOut | null;
 }
 
 // ------------------------------------------------------------------- documents
@@ -285,12 +403,16 @@ export function logout(): Promise<unknown> {
   return apiFetch('/auth/logout', { method: 'POST' });
 }
 
-/** The signed-in user, or `null` when the session cookie is absent or stale. */
+/** The signed-in user, or `null` when the session cookie is absent, stale, or the
+ * API is unreachable (a network failure throws a plain `TypeError: fetch failed`,
+ * not an `ApiError`). All three mean "no verified identity" — render the
+ * signed-out shell rather than 500 every route when the backend is down. */
 export async function getMe(): Promise<User | null> {
   try {
     return await apiFetch<User>('/auth/me');
   } catch (error) {
     if (error instanceof ApiError && error.code === 'NOT_AUTHENTICATED') return null;
+    if (!(error instanceof ApiError)) return null;
     throw error;
   }
 }
@@ -410,10 +532,180 @@ export function approvePackVersion(packId: string, draftSessionId: string): Prom
 
 // -------------------------------------------------------------------- studio
 
-export function createStudioSession(title: string): Promise<StudioSessionOut> {
-  return apiFetch<StudioSessionOut>('/studio/sessions', { method: 'POST', body: JSON.stringify({ title }) });
+export function createStudioSession(input: StudioSessionCreate): Promise<StudioSessionOut> {
+  return apiFetch<StudioSessionOut>('/studio/sessions', { method: 'POST', body: JSON.stringify(input) });
 }
 
 export function getStudioSession(sessionId: string): Promise<StudioSessionOut> {
   return apiFetch<StudioSessionOut>(`/studio/sessions/${sessionId}`);
+}
+
+export function listStudioRevisions(sessionId: string): Promise<StudioDraftRevisionOut[]> {
+  return apiFetch<StudioDraftRevisionOut[]>(`/studio/sessions/${sessionId}/revisions`);
+}
+
+export function getStudioRevision(
+  sessionId: string,
+  revisionNo: number,
+): Promise<StudioDraftRevisionOut> {
+  return apiFetch<StudioDraftRevisionOut>(`/studio/sessions/${sessionId}/revisions/${revisionNo}`);
+}
+
+/** Dry-run the current draft against documents (the studio preview gate). */
+export function studioPreview(sessionId: string, documentIds: string[]): Promise<StudioPreviewOut> {
+  return apiFetch<StudioPreviewOut>(`/studio/sessions/${sessionId}/preview`, {
+    method: 'POST',
+    body: JSON.stringify({ document_ids: documentIds }),
+  });
+}
+
+// ---------------------------------------------------------------- governance
+
+export function listPackReviews(packId: string, limit = 100): Promise<PackReviewOut[]> {
+  return apiFetch<PackReviewOut[]>(`/governance/packs/${packId}/reviews?limit=${limit}`);
+}
+
+export function listPackReleases(packId: string, limit = 100): Promise<PackReleaseOut[]> {
+  return apiFetch<PackReleaseOut[]>(`/governance/packs/${packId}/releases?limit=${limit}`);
+}
+
+export function listPackAudit(packId: string, limit = 100): Promise<PackAuditEventOut[]> {
+  return apiFetch<PackAuditEventOut[]>(`/governance/packs/${packId}/audit?limit=${limit}`);
+}
+
+export function submitGovernanceReview(
+  packId: string,
+  revisionId: string,
+): Promise<PackReviewOut> {
+  return apiFetch<PackReviewOut>('/governance/reviews', {
+    method: 'POST',
+    body: JSON.stringify({ pack_id: packId, revision_id: revisionId }),
+  });
+}
+
+export function decideGovernanceReview(
+  reviewId: string,
+  approve: boolean,
+): Promise<GovernanceDecisionOut> {
+  return apiFetch<GovernanceDecisionOut>(`/governance/reviews/${reviewId}/decision`, {
+    method: 'POST',
+    body: JSON.stringify({ approve }),
+  });
+}
+
+export function promotePackRelease(
+  packId: string,
+  packVersionId: string,
+  environment: ReleaseEnvironment,
+): Promise<PackReleaseOut> {
+  return apiFetch<PackReleaseOut>(`/governance/packs/${packId}/releases`, {
+    method: 'POST',
+    body: JSON.stringify({ pack_version_id: packVersionId, environment }),
+  });
+}
+
+export function restorePackRelease(releaseId: string): Promise<PackReleaseOut> {
+  return apiFetch<PackReleaseOut>(`/governance/releases/${releaseId}/restore`, {
+    method: 'POST',
+  });
+}
+
+// ---------------------------------------------------------------------------
+// WorkflowSpecV1 — canonical pack contract.
+//
+// These mirror backend/app/services/workflow_contract.py, which is the single
+// source of truth. The backend serializes with `model_dump(mode="json")`, so
+// StrEnum members arrive as plain strings and UUIDs as strings. Keep these in
+// sync when the Pydantic model moves; do not drift the shapes client-side.
+// ---------------------------------------------------------------------------
+
+export type NodeKind =
+  | 'classify_documents'
+  | 'retrieve_evidence'
+  | 'extract_field'
+  | 'verify_field'
+  | 'evaluate_rule'
+  | 'render_checklist';
+
+export type OnFailure = 'fail_run' | 'skip_node' | 'continue_with_null';
+
+export interface RetryPolicy {
+  max_attempts: number;
+  timeout_seconds: number;
+}
+
+export interface PortRef {
+  node_id: string;
+  port: string;
+}
+
+export interface OutputContract {
+  kind: 'checklist';
+  include_citations: boolean;
+}
+
+export interface Integration {
+  name: string;
+  operation: string;
+}
+
+/**
+ * Recursive boolean AST over a node's output ports. Backend `ConditionNot` owns
+ * field `not_` with alias `"not"`, so the JSON key (and this shape) is `not`.
+ */
+export type Condition =
+  | { all: Condition[] }
+  | { any: Condition[] }
+  | { not: Condition }
+  | { exists: string }
+  | { equals: { path: string; value: string | number | boolean | null } }
+  | { fact_state_is: { path: string; state: 'verified' | 'unsupported' | 'missing' } };
+
+export interface Node {
+  id: string;
+  kind: NodeKind;
+  config: Record<string, unknown>;
+  retry: RetryPolicy;
+  on_failure: OnFailure;
+}
+
+export interface Edge {
+  from: PortRef;
+  to: PortRef;
+  when?: Condition;
+}
+
+export interface Output {
+  name: string;
+  node_id: string;
+  port: string;
+  contract: OutputContract;
+}
+
+export interface WorkflowSpecV1 {
+  schema_version: number;
+  name: string;
+  document_types: string[];
+  nodes: Node[];
+  edges: Edge[];
+  outputs: Output[];
+  integrations: Integration[];
+}
+
+export interface ValidationIssue {
+  code: string;
+  path: string;
+  message: string;
+}
+
+export interface ValidationResult {
+  ok: boolean;
+  errors: ValidationIssue[];
+}
+
+export interface DiffEntry {
+  op: 'add' | 'remove' | 'replace';
+  path: string;
+  prev?: unknown;
+  next?: unknown;
 }

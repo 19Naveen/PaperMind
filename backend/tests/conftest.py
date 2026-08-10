@@ -20,8 +20,8 @@ from sqlalchemy import text
 
 from app import models  # noqa: F401
 from app.core.db import SessionLocal, engine
-from app.services.llm import FakeEmbedder, FakeLLM, set_providers
 from app.models import install_triggers
+from app.services.llm import FakeEmbedder, FakeLLM, set_providers
 
 
 @pytest.fixture(scope="session", autouse=True)

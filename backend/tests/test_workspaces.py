@@ -9,8 +9,8 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.api.v1.routers.auth import router as auth_router
-from app.api.v1.routers.workspaces import router as workspaces_router
+from app.api.routers.auth import router as auth_router
+from app.api.routers.workspaces import router as workspaces_router
 
 
 @pytest.fixture

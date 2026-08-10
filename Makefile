@@ -13,7 +13,7 @@ help:
 backend-install:
 	cd backend && uv sync
 
-backend-run:
+backend-run: db-up
 	cd backend && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 backend-test: db-test-up

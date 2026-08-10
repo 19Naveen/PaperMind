@@ -67,6 +67,8 @@ class PackVersion(Base):
     )
     version: Mapped[int] = mapped_column(Integer, nullable=False)
     spec: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
+    # NULL == legacy v0 (pre-contract). New canonical-workflow versions write 1+.
+    contract_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     pack: Mapped[Pack] = relationship(back_populates="versions")
@@ -102,6 +104,11 @@ class Run(Base):
     stage: Mapped[str | None] = mapped_column(Text, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     report: Mapped[dict[str, object] | None] = mapped_column(JSONB, nullable=True)
+    # The pack release this run executed under (the release that pinned the version
+    # into an environment). Nullable: historical runs predate the release lifecycle.
+    release_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("pack_releases.id", ondelete="SET NULL"), nullable=True
+    )
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
@@ -294,10 +301,96 @@ class StudioSession(Base):
     status: Mapped[str] = mapped_column(Text, nullable=False, default="active")
     spec: Mapped[dict[str, object] | None] = mapped_column(JSONB, nullable=True)
     messages: Mapped[list[dict[str, object]]] = mapped_column(JSONB, nullable=False, default=list)
+    # Revision lifecycle: a session is owned by a workspace/user and pins the pack
+    # version it branched from. current_revision_id points at studio_draft_revisions.id;
+    # left as a plain Uuid with NO FK to avoid a circular FK dependency (a draft revision
+    # FKs this session, this column would FK that revision — the cycle is real, so the
+    # link is app-side). base_pack_version_id is the frozen pack this draft descended from.
+    workspace_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("workspaces.id", ondelete="SET NULL"), nullable=True
+    )
+    created_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    base_pack_version_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("pack_versions.id", ondelete="SET NULL"), nullable=True
+    )
+    current_revision_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
+class StudioTurn(Base):
+    """One turn in the studio conversation. Append-only (UPDATE/DELETE rejected by trigger):
+    the transcript is an audit trail of how a spec evolved, so rewriting history is not allowed."""
+
+    __tablename__ = "studio_turns"
+    __table_args__ = (Index("ix_studio_turns_session_order", "session_id", "created_at"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_uuid)
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("studio_sessions.id", ondelete="CASCADE"), nullable=False
+    )
+    role: Mapped[str] = mapped_column(Text, nullable=False)  # 'user' | 'assistant'
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    model_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="ok")  # 'ok' | 'failed'
+    # revision_id points at studio_draft_revisions.id; plain Uuid (no FK) to avoid a
+    # circular FK dependency between studio_turns and studio_draft_revisions (each
+    # references the other). Integrity is enforced in app code, not by the DB.
+    revision_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class StudioDraftRevision(Base):
+    """One frozen draft of a session's spec. Append-only: UPDATE/DELETE rejected by trigger.
+    workflow holds the canonical WorkflowSpecV1 dump; diff/validation record how it differs
+    from its parent and whether it currently validates. digest is the sha256 of the workflow."""
+
+    __tablename__ = "studio_draft_revisions"
+    __table_args__ = (
+        UniqueConstraint("session_id", "revision_no", name="uq_studio_revisions_session_no"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_uuid)
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("studio_sessions.id", ondelete="CASCADE"), nullable=False
+    )
+    revision_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    # parent_id is a self-reference (the prior revision this one was built from); plain
+    # Uuid with NO FK to avoid a self-referential FK that would also need to be append-only
+    # compatible. The chain is app-managed.
+    parent_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    workflow: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
+    diff: Mapped[list[dict[str, object]]] = mapped_column(JSONB, nullable=False, default=list)
+    validation: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False, default=dict)
+    digest: Mapped[str] = mapped_column(Text, nullable=False)
+    model_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class StudioTestRun(Base):
+    """A dry run of one revision against a set of documents. Append-only like the revision it
+    tests: a test outcome is evidence, not an editable record. summary holds only safe counts."""
+
+    __tablename__ = "studio_test_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_uuid)
+    revision_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("studio_draft_revisions.id", ondelete="CASCADE"), nullable=False
+    )
+    document_ids: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
+    summary: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False, default=dict)
+    digest: Mapped[str] = mapped_column(Text, nullable=False)
+    created_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class User(Base):
@@ -320,10 +413,16 @@ class User(Base):
 
 
 class Workspace(Base):
-    """A business objective and the one Pack that serves it. The 1:1 Workspace->Pack rule is
-    a UNIQUE on pack_id — a constraint the DB enforces, not a convention route code remembers."""
+    """A business objective and the one Pack that serves it. A workspace holds a single
+    Pack (enforced in route code); a published Pack may serve any number of workspaces."""
 
     __tablename__ = "workspaces"
+    __table_args__ = (
+        CheckConstraint(
+            "environment IN ('development','staging','production')",
+            name="ck_workspaces_environment",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_uuid)
     owner_id: Mapped[uuid.UUID] = mapped_column(
@@ -331,10 +430,16 @@ class Workspace(Base):
     )
     name: Mapped[str] = mapped_column(Text, nullable=False)
     goal: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
-    # Nullable: a workspace is authored before its Pack is frozen. Unique: at most one
-    # workspace may claim a given Pack.
+    # Which deployment the workspace's Pack is released to. 'production' is the default
+    # so pre-lifecycle workspaces read as the production tenant they already are.
+    environment: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default="production"
+    )
+    # Nullable: a workspace is authored before its Pack is frozen. Not unique: a
+    # marketplace Pack is a shared artifact any number of workspaces may install —
+    # each workspace still holds only one Pack (enforced in route code).
     pack_id: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid, ForeignKey("packs.id", ondelete="SET NULL"), unique=True, nullable=True
+        Uuid, ForeignKey("packs.id", ondelete="SET NULL"), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
@@ -398,6 +503,127 @@ class PackAsset(Base):
     pack_version: Mapped[PackVersion] = relationship(back_populates="assets")
 
 
+class RunNodeAttempt(Base):
+    """One attempt at one DAG node within a run. This is LIVE execution state — status and
+    timestamps mutate as the run progresses, so unlike pack_versions there is deliberately
+    NO immutability trigger. One row per (run, node, attempt)."""
+
+    __tablename__ = "run_node_attempts"
+    __table_args__ = (
+        UniqueConstraint(
+            "run_id", "node_id", "attempt_no", name="uq_run_node_attempts_run_node_attempt"
+        ),
+        Index("ix_run_node_attempts_run_id", "run_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_uuid)
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("runs.id", ondelete="CASCADE"), nullable=False
+    )
+    node_id: Mapped[str] = mapped_column(Text, nullable=False)
+    attempt_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="running")
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    branch_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    output_digest: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class PackReview(Base):
+    """A governance review of one draft revision. A pending review may be updated to
+    approved/rejected; a terminal review is immutable (trigger-enforced)."""
+
+    __tablename__ = "pack_reviews"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_uuid)
+    pack_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("packs.id", ondelete="CASCADE"), nullable=False
+    )
+    # revision_id points at studio_draft_revisions.id; plain Uuid with NO FK — the same
+    # circular-dependency rationale as studio_sessions.current_revision_id (the draft
+    # revision the review decides on lives under a session that references revisions).
+    revision_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    submitted_by: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    submitted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    approved_by: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    state: Mapped[str] = mapped_column(Text, nullable=False, server_default="pending")
+    validation_digest: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class PackRelease(Base):
+    """One release action (promote/rollback/install…) of a pack version into an environment.
+    Append-only: the release log is an audit trail, so UPDATE/DELETE are trigger-rejected."""
+
+    __tablename__ = "pack_releases"
+    __table_args__ = (Index("ix_pack_releases_pack_env", "pack_id", "environment"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_uuid)
+    pack_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("packs.id", ondelete="CASCADE"), nullable=False
+    )
+    pack_version_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("pack_versions.id", ondelete="CASCADE"), nullable=False
+    )
+    environment: Mapped[str] = mapped_column(Text, nullable=False)
+    action: Mapped[str] = mapped_column(Text, nullable=False)
+    # Self-referential links (the release this one superseded / restored from) kept as
+    # plain Uuids with NO FK: pack_releases is append-only, so an FK would join to rows
+    # that can never be deleted while forcing an extra constraint — the chain is app-managed.
+    source_release_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    restored_from_release_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class PackAuditEvent(Base):
+    """Every governance-relevant event on a pack. Fully append-only (UPDATE/DELETE rejected
+    by trigger): an audit trail that could be rewritten is not an audit trail."""
+
+    __tablename__ = "pack_audit_events"
+    __table_args__ = (Index("ix_pack_audit_events_pack_created", "pack_id", "created_at"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_uuid)
+    pack_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("packs.id", ondelete="CASCADE"), nullable=False
+    )
+    event_type: Mapped[str] = mapped_column(Text, nullable=False)
+    actor_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    revision_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    version_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("pack_versions.id", ondelete="SET NULL"), nullable=True
+    )
+    release_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    environment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # DB column is literally `metadata`; the attribute is event_metadata because `metadata`
+    # is reserved by the Declarative API (it names the class's MetaData object).
+    event_metadata: Mapped[dict[str, object]] = mapped_column(
+        "metadata", JSONB, nullable=False, default=dict
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
 TRIGGERS_SQL_SOURCE = """
 -- Append-only pack_versions: principle 6 lives in the DB, not in Python.
 CREATE OR REPLACE FUNCTION f_block_pack_version_mutation() RETURNS trigger AS $$
@@ -451,6 +677,85 @@ CREATE CONSTRAINT TRIGGER citations_preserve_fact_invariants
     AFTER INSERT OR UPDATE OR DELETE ON citations
     DEFERRABLE INITIALLY DEFERRED
     FOR EACH ROW EXECUTE FUNCTION f_check_verified_have_citations();
+
+-- Append-only studio_draft_revisions / studio_turns / studio_test_runs: a revision is a
+-- frozen artifact like pack_versions, and turns/test-runs are the audit trail behind it.
+CREATE OR REPLACE FUNCTION f_block_studio_draft_revisions_mutation() RETURNS trigger AS $$
+BEGIN
+    RAISE EXCEPTION 'studio_draft_revisions is append-only: UPDATE/DELETE is not allowed (revision_no %% of session %%)',
+        OLD.revision_no, OLD.session_id;
+    RETURN OLD;
+END $$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS studio_draft_revisions_no_update ON studio_draft_revisions;
+CREATE TRIGGER studio_draft_revisions_no_update
+    BEFORE UPDATE OR DELETE ON studio_draft_revisions
+    FOR EACH ROW EXECUTE FUNCTION f_block_studio_draft_revisions_mutation();
+
+CREATE OR REPLACE FUNCTION f_block_studio_turns_mutation() RETURNS trigger AS $$
+BEGIN
+    RAISE EXCEPTION 'studio_turns is append-only: UPDATE/DELETE is not allowed (turn %% of session %%)',
+        OLD.id, OLD.session_id;
+    RETURN OLD;
+END $$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS studio_turns_no_update ON studio_turns;
+CREATE TRIGGER studio_turns_no_update
+    BEFORE UPDATE OR DELETE ON studio_turns
+    FOR EACH ROW EXECUTE FUNCTION f_block_studio_turns_mutation();
+
+CREATE OR REPLACE FUNCTION f_block_studio_test_runs_mutation() RETURNS trigger AS $$
+BEGIN
+    RAISE EXCEPTION 'studio_test_runs is append-only: UPDATE/DELETE is not allowed (test run %% of revision %%)',
+        OLD.id, OLD.revision_id;
+    RETURN OLD;
+END $$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS studio_test_runs_no_update ON studio_test_runs;
+CREATE TRIGGER studio_test_runs_no_update
+    BEFORE UPDATE OR DELETE ON studio_test_runs
+    FOR EACH ROW EXECUTE FUNCTION f_block_studio_test_runs_mutation();
+
+-- Append-only pack_audit_events / pack_releases: the release log and audit trail are
+-- immutable evidence, like pack_versions. pack_reviews is the exception: a *pending*
+-- review may be updated (to approved/rejected), but a terminal review is frozen.
+CREATE OR REPLACE FUNCTION f_block_pack_audit_event_mutation() RETURNS trigger AS $$
+BEGIN
+    RAISE EXCEPTION 'pack_audit_events is append-only: UPDATE/DELETE is not allowed (event %% of pack %%)',
+        OLD.id, OLD.pack_id;
+    RETURN OLD;
+END $$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS pack_audit_events_no_update ON pack_audit_events;
+CREATE TRIGGER pack_audit_events_no_update
+    BEFORE UPDATE OR DELETE ON pack_audit_events
+    FOR EACH ROW EXECUTE FUNCTION f_block_pack_audit_event_mutation();
+
+CREATE OR REPLACE FUNCTION f_block_pack_release_mutation() RETURNS trigger AS $$
+BEGIN
+    RAISE EXCEPTION 'pack_releases is append-only: UPDATE/DELETE is not allowed (release %% of pack %%)',
+        OLD.id, OLD.pack_id;
+    RETURN OLD;
+END $$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS pack_releases_no_update ON pack_releases;
+CREATE TRIGGER pack_releases_no_update
+    BEFORE UPDATE OR DELETE ON pack_releases
+    FOR EACH ROW EXECUTE FUNCTION f_block_pack_release_mutation();
+
+CREATE OR REPLACE FUNCTION f_block_pack_review_mutation() RETURNS trigger AS $$
+BEGIN
+    IF TG_OP = 'DELETE' OR OLD.state IN ('approved', 'rejected') THEN
+        RAISE EXCEPTION 'pack_reviews is immutable once decided: mutation not allowed (review %% of pack %%)',
+            OLD.id, OLD.pack_id;
+    END IF;
+    RETURN NEW;
+END $$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS pack_reviews_no_update ON pack_reviews;
+CREATE TRIGGER pack_reviews_no_update
+    BEFORE UPDATE OR DELETE ON pack_reviews
+    FOR EACH ROW EXECUTE FUNCTION f_block_pack_review_mutation();
 """
 
 

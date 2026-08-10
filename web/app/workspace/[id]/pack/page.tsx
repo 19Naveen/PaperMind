@@ -1,7 +1,11 @@
 import { notFound } from 'next/navigation';
 import { PackBuilderView } from '@/components/PackBuilderView';
-import { ApiError, getWorkspace } from '@/lib/api';
-import { Button, Card, CardBody, CardKicker, CardTitle, PageHeader, Tag } from '@/components/ui';
+import { ApiError, getPack, getWorkspace } from '@/lib/api';
+import { Button, Card, CardHeader, PageHeader, Tag } from '@/components/ui';
+
+function RowList({ children }: { children: React.ReactNode }) {
+  return <ul className="rows">{children}</ul>;
+}
 
 export default async function PackBuilderPage({
   params,
@@ -14,49 +18,120 @@ export default async function PackBuilderPage({
     throw error;
   });
 
-  // A workspace claims exactly one Pack; when it has one, authoring is closed and the
-  // overview of the frozen version replaces the studio.
-  if (workspace.pack_id) {
-    return (
-      <main className="min-h-full bg-ground text-ink">
-        <PageHeader
-          eyebrow="Pack"
-          title={workspace.pack_name ?? 'Installed Pack'}
-          actions={
-            <>
-              <Tag variant="accent">
-                {workspace.pack_version != null ? `v${workspace.pack_version}` : 'installed'}
-              </Tag>
-              <Button href={`/workspace/${workspace.id}`} variant="secondary" size="sm">
-                Back to workspace
-              </Button>
-            </>
-          }
-        />
-        <div className="mx-auto max-w-2xl px-6 py-10">
-          <Card>
-            <CardKicker>Installed pack</CardKicker>
-            <CardTitle className="mt-1 text-[24px] text-accent">{workspace.pack_name}</CardTitle>
-            <CardBody className="mt-2">
-              {workspace.goal ||
-                'This workspace runs a single frozen Pack — every session executes the same version, so results stay comparable.'}
-            </CardBody>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Tag>
-                {workspace.pack_version != null ? `Version ${workspace.pack_version}` : 'Draft'}
-              </Tag>
-              <Tag variant="outline">{workspace.session_count} sessions</Tag>
-              <Tag variant="outline">{workspace.assets.length} assets</Tag>
-            </div>
-          </Card>
-          <p className="mt-6 text-[12.5px] leading-relaxed text-ink-2">
-            A Pack version is append-only: to change behaviour, author a new version and
-            approve it — the workspace keeps running the version each session pinned.
-          </p>
-        </div>
-      </main>
-    );
+  // No Pack yet → the authoring Studio.
+  if (!workspace.pack_id) {
+    return <PackBuilderView workspaceId={workspace.id} workspaceName={workspace.name} />;
   }
 
-  return <PackBuilderView workspaceId={workspace.id} workspaceName={workspace.name} />;
+  // Installed Pack → a read-only view of the frozen version. Edit opens the Studio.
+  const detail = await getPack(workspace.pack_id).catch(() => null);
+  const latest = detail ? detail.versions[detail.versions.length - 1] : null;
+  const spec = latest?.spec ?? null;
+  const versionLabel = workspace.pack_version != null ? `v${workspace.pack_version}` : 'installed';
+
+  return (
+    <div className="page">
+      <PageHeader
+        eyebrow="Installed Pack"
+        title={workspace.pack_name ?? 'Pack'}
+        meta={
+          <>
+            <Tag variant="accent">{versionLabel}</Tag> Frozen — every session runs this exact version. Edit authors a new
+            version; the installed one stays put until you promote.
+          </>
+        }
+        actions={
+          <>
+            <Button href={`/workspace/${workspace.id}`} variant="ghost">← Workspace</Button>
+            <Button href={`/marketplace/${workspace.pack_id}/edit`} variant="primary">Edit pack</Button>
+          </>
+        }
+      />
+
+      <div className="wk-grid mt-6">
+        <div className="stack">
+          {spec ? (
+            <>
+              <Card pad={false}>
+                <CardHeader title="Documents reviewed" />
+                <div className="card-pad">
+                  <RowList>
+                    {spec.document_types.map((doc) => <li key={doc}>{doc}</li>)}
+                    {spec.document_types.length === 0 && <li className="muted">No document types defined.</li>}
+                  </RowList>
+                </div>
+              </Card>
+              <Card pad={false}>
+                <CardHeader title="Fields extracted" count={spec.fields.length} />
+                <div className="card-pad">
+                  <RowList>
+                    {spec.fields.map((field) => (
+                      <li key={field.name} className="row-2">
+                        <span>
+                          <span className="mono">{field.name}</span>
+                          <span className="row-sub">{field.description}</span>
+                        </span>
+                        <Tag>{field.type}</Tag>
+                      </li>
+                    ))}
+                    {spec.fields.length === 0 && <li className="muted">No fields defined.</li>}
+                  </RowList>
+                </div>
+              </Card>
+              <Card pad={false}>
+                <CardHeader title="Rules" count={spec.rules.length} />
+                <div className="card-pad">
+                  <RowList>
+                    {spec.rules.map((rule) => <li key={rule.id}>{rule.description}</li>)}
+                    {spec.rules.length === 0 && <li className="muted">No rules defined.</li>}
+                  </RowList>
+                </div>
+              </Card>
+            </>
+          ) : (
+            <Card pad={false}>
+              <CardHeader title="Pack spec" />
+              <div className="card-pad">
+                <p className="muted">The spec for this installed version isn&apos;t available to read back here. Open Edit to view it in the Studio.</p>
+              </div>
+            </Card>
+          )}
+
+          {detail && detail.versions.length > 0 && (
+            <Card pad={false}>
+              <CardHeader title="Version history" count={detail.versions.length} />
+              <div className="card-pad">
+                <RowList>
+                  {[...detail.versions].reverse().map((version) => (
+                    <li key={version.id} className="row-2">
+                      <span className="mono">Version {version.version}{version.version === workspace.pack_version ? ' · installed' : ''}</span>
+                      <span className="row-sub">{new Date(version.created_at).toLocaleDateString()}</span>
+                    </li>
+                  ))}
+                </RowList>
+              </div>
+            </Card>
+          )}
+        </div>
+
+        <aside className="stack">
+          <Card>
+            <div className="flbl-wrap" style={{ justifyContent: 'space-between' }}>
+              <span className="chd-title">In this workspace</span>
+              <Tag variant="outline">{versionLabel}</Tag>
+            </div>
+            <div className="mt-3">
+              <ul className="rows">
+                <li className="row-2"><span>Sessions</span><b className="mono">{workspace.session_count}</b></li>
+                <li className="row-2"><span>Assets</span><b className="mono">{workspace.assets.length}</b></li>
+              </ul>
+            </div>
+            <p className="fineprint mt-3">
+              A Pack version is append-only. Editing authors a new version for review — sessions already running finish on the version they pinned.
+            </p>
+          </Card>
+        </aside>
+      </div>
+    </div>
+  );
 }
