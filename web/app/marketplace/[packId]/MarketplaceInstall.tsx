@@ -53,7 +53,7 @@ export function MarketplaceInstall({
   return (
     <div>
       {installable.length === 0 ? (
-        <div className="text-[12.5px] leading-relaxed text-ink-2">
+        <div className="text-sm leading-relaxed text-ink-2">
           Every workspace already has a Pack.
           <Button href="/workspace/new" variant="secondary" size="sm" className="mt-2">
             Create a workspace
@@ -78,7 +78,7 @@ export function MarketplaceInstall({
           </ActionButton>
         </>
       )}
-      {error && <p className="mt-2 text-[12px] text-missing">{error}</p>}
+      {error && <p className="mt-2 text-sm text-missing">{error}</p>}
     </div>
   );
 }

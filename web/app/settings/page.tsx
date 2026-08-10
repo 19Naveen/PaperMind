@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { initialsOf, useAuth } from '@/components/auth/AuthProvider';
+import { useTheme, type ThemeChoice } from '@/components/theme';
 import { ActionButton, Button, EmptyState, Input, PageHeader } from '@/components/ui';
-import { IconAlert, IconSettings } from '@/lib/icons';
+import { IconAlert, IconCheck, IconSettings } from '@/lib/icons';
 import { changePasswordAction, updateMeAction, type ProfileFailure } from '@/lib/session';
 
 // `.switch` is styled by globals.css via `[aria-checked]` — the correct
@@ -30,15 +31,65 @@ function Switch({
 }
 
 // `Input` is a closed primitive that renders its own `.field`, and `.ferr` is
-// scoped under `.field` in globals.css, so the error is rendered just outside
-// with the same visual treatment inline.
+// scoped under `.field` in globals.css, so the error carries `.auth-error` —
+// the same icon + danger-text treatment the sign-in form uses.
 function FieldError({ message }: { message: string | undefined }) {
   if (!message) return null;
   return (
-    <p style={{ display: 'flex', gap: 5, alignItems: 'center', color: 'var(--danger)', fontSize: 12, marginTop: 6 }}>
+    <p className="auth-error" role="alert">
       <IconAlert className="ic sm" />
       <span>{message}</span>
     </p>
+  );
+}
+
+// Saved/updated confirmations, in the interface's voice: past tense, matching
+// the verb on the button that produced them.
+function SavedNote({ message }: { message: string | null }) {
+  if (!message) return null;
+  return (
+    <span className="text-xs" style={{ color: 'var(--ok)', display: 'flex', alignItems: 'center', gap: 'var(--s1)' }}>
+      <IconCheck className="ic sm" />
+      {message}
+    </span>
+  );
+}
+
+const THEME_OPTIONS: { value: ThemeChoice; label: string; hint: string }[] = [
+  { value: 'light', label: 'Light', hint: 'Always light' },
+  { value: 'dark', label: 'Dark', hint: 'Always dark' },
+  { value: 'system', label: 'System', hint: 'Follows your OS' },
+];
+
+function AppearanceCard() {
+  const { choice, setChoice } = useTheme();
+
+  return (
+    <div className="card set-card">
+      <h3>Appearance</h3>
+      <p className="sub">Applies to this browser only, and takes effect immediately.</p>
+      <div className="theme-opts" role="group" aria-label="Colour theme">
+        {THEME_OPTIONS.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            className="theme-opt"
+            aria-pressed={choice === option.value}
+            onClick={() => setChoice(option.value)}
+          >
+            <span className={`theme-swatch ${option.value}`} aria-hidden="true">
+              <i className="sw-rail" />
+              <i className="sw-body" />
+            </span>
+            <span className="theme-lbl">
+              {choice === option.value && <IconCheck className="ic sm" />}
+              {option.label}
+            </span>
+            <span className="fineprint">{option.hint}</span>
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -70,8 +121,8 @@ function ProfileCard() {
       <div className="avatar-row">
         <span className="avatar xl">{initialsOf(user?.name ?? '?')}</span>
         <div>
-          <b style={{ fontSize: '13.5px' }}>{user?.name}</b>
-          <div className="muted" style={{ fontSize: '11.5px', textTransform: 'capitalize' }}>
+          <b className="text-base">{user?.name}</b>
+          <div className="muted text-xs" style={{ textTransform: 'capitalize' }}>
             {user?.role}
           </div>
         </div>
@@ -99,14 +150,12 @@ function ProfileCard() {
         }}
       />
       <FieldError message={error?.fields.email} />
-      {error && !error.fields.name && !error.fields.email && (
-        <p style={{ color: 'var(--danger)', fontSize: 12, marginTop: 4 }}>{error.message}</p>
-      )}
-      <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 12 }}>
+      {error && !error.fields.name && !error.fields.email && <FieldError message={error.message} />}
+      <div className="flbl-wrap mt-3">
         <ActionButton onClick={() => void save()} disabled={busy} variant="primary">
           {busy ? 'Saving…' : 'Save changes'}
         </ActionButton>
-        {message && <span style={{ color: 'var(--ok)', fontSize: 12 }}>{message}</span>}
+        <SavedNote message={message} />
       </div>
     </div>
   );
@@ -183,14 +232,14 @@ function SecurityCard() {
         }}
       />
       <FieldError message={noMatch ? 'Passwords do not match.' : undefined} />
-      <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div className="flbl-wrap mt-3">
         <ActionButton onClick={() => void save()} disabled={!canSave} variant="primary">
           {busy ? 'Updating…' : 'Update password'}
         </ActionButton>
-        {message && <span style={{ color: 'var(--ok)', fontSize: 12 }}>{message}</span>}
+        <SavedNote message={message} />
       </div>
-      <hr className="divider" style={{ margin: '18px 0 14px' }} />
-      <div className="field" style={{ marginBottom: 6 }}>
+      <hr className="divider" />
+      <div className="field">
         <label>API key</label>
         {/* Honest unavailable state: the app has no API-key feature yet, so no
             fabricated key and no "Regenerate" button that implies one exists. */}
@@ -277,9 +326,7 @@ function NotificationsCard() {
           label="Run completion notices"
         />
       </div>
-      <p className="muted" style={{ fontSize: 10.5, marginTop: 12, fontFamily: 'var(--f-mono)' }}>
-        notification preferences are browser-local until the API grows an endpoint for them
-      </p>
+      <p className="stamp mt-3">Saved in this browser only</p>
     </div>
   );
 }
@@ -307,6 +354,7 @@ export default function SettingsPage() {
       <div className="set-grid">
         <ProfileCard />
         <SecurityCard />
+        <AppearanceCard />
         <NotificationsCard />
       </div>
     </div>

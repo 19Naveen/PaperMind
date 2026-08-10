@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useAuth, initialsOf } from '@/components/auth/AuthProvider';
 import { signOutAction } from '@/lib/session';
+import { Avatar } from '@/components/ui';
 import { IconSettings, IconUser } from '@/lib/icons';
 
 /** Top-bar account menu — the reference `.avatar.top` trigger + `.accmenu`. */
@@ -12,8 +13,8 @@ export function HomeAccountMenu() {
 
   return (
     <details className="accwrap">
-      <summary className="avatar top" aria-label="Open account menu" aria-haspopup="menu">
-        {initialsOf(user.name)}
+      <summary aria-label="Open account menu" aria-haspopup="menu">
+        <Avatar initials={initialsOf(user.name)} className="top" />
       </summary>
       <div className="accmenu" role="menu">
         <div className="acc-hd">

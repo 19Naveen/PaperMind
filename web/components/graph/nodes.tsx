@@ -14,15 +14,15 @@ export type GraphNodeData = {
 type GraphNode = Node<GraphNodeData>;
 
 const shell =
-  'min-w-[168px] max-w-[220px] bg-surface border border-rule px-3 py-2 text-[13px] text-ink shadow-sm transition-[border-color,box-shadow] hover:border-accent hover:shadow-md';
+  'min-w-40 max-w-56 bg-surface border border-rule px-3 py-2 text-base text-ink shadow-sm transition hover:border-accent hover:shadow-md';
 
-const kicker = 'text-[9.5px] tracking-[0.1em] uppercase text-accent';
+const kicker = 'text-2xs tracking-widest uppercase text-accent';
 
 /** Document types: the sources feeding the pipeline. Page glyph, numbered kicker. */
 export function DocTypeNode({ id, data, selected }: NodeProps<GraphNode>) {
   return (
     <div className={`${shell} ${selected ? 'ring-2 ring-accent' : ''}`}>
-      <Handle type="source" position={Position.Right} className="!h-2 !w-2 !border-rule !bg-ink-2" />
+      <Handle type="source" position={Position.Right} />
       <div className="flex items-center gap-1.5">
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="shrink-0 text-ink-2">
           <path
@@ -40,7 +40,7 @@ export function DocTypeNode({ id, data, selected }: NodeProps<GraphNode>) {
       <EditableLabel
         value={data.label}
         onChange={(v) => data.onRename(id, v)}
-        className="display mt-1 block text-[13px] leading-tight"
+        className="mt-1 block text-base leading-tight"
       />
     </div>
   );
@@ -50,8 +50,8 @@ export function DocTypeNode({ id, data, selected }: NodeProps<GraphNode>) {
 export function FieldNode({ id, data, selected }: NodeProps<GraphNode>) {
   return (
     <div className={`${shell} ${selected ? 'ring-2 ring-accent' : ''}`}>
-      <Handle type="target" position={Position.Left} className="!h-2 !w-2 !border-rule !bg-ink-2" />
-      <Handle type="source" position={Position.Right} className="!h-2 !w-2 !border-rule !bg-ink-2" />
+      <Handle type="target" position={Position.Left} />
+      <Handle type="source" position={Position.Right} />
       <div className="flex items-center gap-1.5">
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="shrink-0 text-ink-2">
           <path d="M1.5 2h9L7 6.5V10l-2 1V6.5L1.5 2z" stroke="currentColor" strokeWidth="1" strokeLinejoin="round" />
@@ -63,7 +63,7 @@ export function FieldNode({ id, data, selected }: NodeProps<GraphNode>) {
       <EditableLabel
         value={data.label}
         onChange={(v) => data.onRename(id, v)}
-        className="display mt-1 block text-[13px] leading-tight"
+        className="mt-1 block text-base leading-tight"
       />
       {data.detail && <p className="stamp mt-1.5 inline-block">{data.detail}</p>}
     </div>
@@ -74,7 +74,7 @@ export function FieldNode({ id, data, selected }: NodeProps<GraphNode>) {
 export function RuleNode({ id, data, selected }: NodeProps<GraphNode>) {
   return (
     <div className={`${shell} ${selected ? 'ring-2 ring-accent' : ''}`}>
-      <Handle type="target" position={Position.Left} className="!h-2 !w-2 !border-rule !bg-ink-2" />
+      <Handle type="target" position={Position.Left} />
       <div className="flex items-center gap-1.5">
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="shrink-0 text-ink-2">
           <path d="M6 1l4.5 2.2v3.6L6 11 1.5 6.8V3.2L6 1z" stroke="currentColor" strokeWidth="1" strokeLinejoin="round" />
@@ -87,10 +87,10 @@ export function RuleNode({ id, data, selected }: NodeProps<GraphNode>) {
       <EditableLabel
         value={data.label}
         onChange={(v) => data.onRename(id, v)}
-        className="display mt-1 block text-[13px] leading-tight"
+        className="mt-1 block text-base leading-tight"
       />
       {data.detail && (
-        <p className="mt-1 truncate text-[12px] text-ink-2" title={data.detail}>
+        <p className="mt-1 truncate text-sm text-ink-2" title={data.detail}>
           {data.detail}
         </p>
       )}

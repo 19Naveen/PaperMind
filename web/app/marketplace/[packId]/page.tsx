@@ -9,6 +9,7 @@ import {
   listWorkspaces,
 } from '@/lib/api';
 import { Button, Card, CardHeader, CardKicker, CardTitle, PageHeader, Tag } from '@/components/ui';
+import { formatDate } from '@/lib/format';
 import { MarketplaceInstall } from './MarketplaceInstall';
 import { ReleasePanel } from './ReleasePanel';
 
@@ -24,6 +25,7 @@ function RowList({ children }: { children: React.ReactNode }) {
   return <ul className="rows">{children}</ul>;
 }
 
+/** Singapore-style date: DD/MM/YYYY. */
 export default async function PackDetailPage({
   params,
   searchParams,
@@ -127,7 +129,7 @@ export default async function PackDetailPage({
                 {[...detail.versions].reverse().map((version) => (
                   <li key={version.id} className="row-2">
                     <span className="mono">Version {version.version}</span>
-                    <span className="row-sub">{new Date(version.created_at).toLocaleDateString()}</span>
+                    <span className="row-sub">{formatDate(version.created_at)}</span>
                   </li>
                 ))}
                 {detail.versions.length === 0 && <li className="muted">No versions yet.</li>}

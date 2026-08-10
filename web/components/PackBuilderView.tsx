@@ -27,8 +27,9 @@ import {
   submitReviewAction,
 } from '@/lib/session';
 import type { StudioPreviewOut } from '@/lib/api';
-import { ActionButton, CardKicker, EmptyState, Input, PageHeader, Seg, Tag } from '@/components/ui';
+import { ActionButton, CardKicker, EmptyState, Input, Seg, Tag } from '@/components/ui';
 import { GraphCanvas } from '@/components/GraphCanvas';
+import { IconSparkle } from '@/lib/icons';
 
 interface ChatLine {
   role: 'user' | 'assistant';
@@ -73,15 +74,15 @@ type WorkflowRFNode = Node<WorkflowNodeData>;
 function WorkflowNodeShell({ data, selected }: NodeProps<WorkflowRFNode>) {
   return (
     <div
-      className={`min-w-[168px] max-w-[220px] border border-rule bg-surface px-3 py-2 text-[13px] text-ink shadow-sm ${
+      className={`min-w-40 max-w-56 border border-rule bg-surface px-3 py-2 text-base text-ink shadow-sm ${
         selected ? 'ring-2 ring-accent' : ''
       }`}
     >
-      <Handle type="target" position={Position.Left} className="!h-2 !w-2 !border-rule !bg-ink-2" />
-      <Handle type="source" position={Position.Right} className="!h-2 !w-2 !border-rule !bg-ink-2" />
-      <p className="text-[9.5px] uppercase tracking-[0.1em] text-accent">{data.kind.replace(/_/g, ' ')}</p>
-      <p className="display mt-1 block text-[13px] leading-tight">{data.label}</p>
-      {data.detail && <p className="mt-1 text-[12px] leading-snug text-ink-2">{data.detail}</p>}
+      <Handle type="target" position={Position.Left} />
+      <Handle type="source" position={Position.Right} />
+      <p className="text-2xs uppercase tracking-widest text-accent">{data.kind.replace(/_/g, ' ')}</p>
+      <p className="mt-1 block text-base leading-tight">{data.label}</p>
+      {data.detail && <p className="mt-1 text-sm leading-snug text-ink-2">{data.detail}</p>}
     </div>
   );
 }
@@ -106,7 +107,7 @@ function WorkflowDiagram({
   const rfEdges: Edge[] = edges.map((e) => ({ id: e.id, source: e.source, target: e.target, label: e.label }));
   return (
     <ReactFlowProvider>
-      <div className="relative min-w-0 flex-1 bg-ground">
+      <div className="pm-graph relative min-w-0 flex-1 bg-ground">
         <ReactFlow
           nodes={rfNodes}
           edges={rfEdges}
@@ -119,19 +120,16 @@ function WorkflowDiagram({
           fitView
           defaultEdgeOptions={{
             style: { stroke: 'var(--color-ink-2)', strokeWidth: 1.5 },
-            labelStyle: { fill: 'var(--color-ink-2)', fontSize: 10 },
+            labelStyle: { fill: 'var(--color-ink-2)', fontSize: 'var(--t-2xs)' },
           }}
         >
           <Background
             variant={BackgroundVariant.Dots}
-            color="color-mix(in srgb, #5b5bd6 18%, transparent)"
+            color="color-mix(in srgb, var(--color-accent) 18%, transparent)"
             gap={28}
             size={1}
           />
-          <Controls
-            showInteractive={false}
-            className="!border !border-rule !bg-surface !shadow-sm [&_button]:!border-rule [&_button]:!bg-surface [&_button]:!text-ink [&_button:hover]:!bg-raised [&_svg]:!fill-ink"
-          />
+          <Controls showInteractive={false} />
         </ReactFlow>
       </div>
     </ReactFlowProvider>
@@ -415,70 +413,75 @@ export function PackBuilderView({
 
   return (
     <section className="view full" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, overflow: 'hidden', background: 'var(--bg)' }}>
-      <div className="pane-head" style={{ flex: 'none', minHeight: 0, padding: '10px 22px', flexDirection: 'column', alignItems: 'stretch', gap: 0 }}>
-      <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 4 }}>
-        <Link href={editing && packId ? `/marketplace/${packId}` : `/workspace/${workspaceId ?? ''}`} className="btn ghost sm">
-          ← Back to {editing ? 'pack page' : workspaceName ?? 'workspace'}
-        </Link>
-      </div>
-      <PageHeader
-        compact
-        eyebrow={editing ? 'Edit published pack' : `Editing pack · ${workspaceName}`}
-        title={packName || (editing ? `Edit ${existingPackName}` : `Author a Pack for ${workspaceName}`)}
-        actions={
-          <>
-            <Seg
-              options={[
-                { value: 'diagram', label: 'Diagram' },
-                { value: 'ports', label: 'Ports' },
-                { value: 'ledger', label: 'Ledger' },
-                { value: 'changes', label: 'Changes' },
-                { value: 'validation', label: 'Validation' },
-                { value: 'test', label: 'Test' },
-              ]}
-              value={view}
-              onChange={setView}
-            />
-            <Tag variant={invalid ? 'danger' : 'neutral'}>
-              {invalid ? 'Needs validation' : hasDraft ? 'Draft ready' : 'Conversation mode'}
-            </Tag>
+      <div className="pane-head" style={{ flex: 'none', minHeight: 0, flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
+        <div className="flex justify-start">
+          <Link href={editing && packId ? `/marketplace/${packId}` : `/workspace/${workspaceId ?? ''}`} className="btn ghost sm">
+            ← Back to {editing ? 'pack page' : workspaceName ?? 'workspace'}
+          </Link>
+        </div>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="eyebrow">{editing ? 'Edit published pack' : `Editing pack · ${workspaceName}`}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="page-title">{packName || (editing ? `Edit ${existingPackName}` : `Author a Pack for ${workspaceName}`)}</h1>
+              <Tag variant={invalid ? 'danger' : 'neutral'}>
+                {invalid ? 'Needs validation' : hasDraft ? 'Draft ready' : 'Conversation mode'}
+              </Tag>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
             {editing && revision && revision.validation.ok && (
-              <ActionButton variant="outline" disabled={submitting} onClick={submitForReview}>
+              <ActionButton variant="outline" size="sm" disabled={submitting} onClick={submitForReview}>
                 {submitting ? 'Submitting…' : 'Submit for review'}
               </ActionButton>
             )}
             <ActionButton
               variant="primary"
+              size="sm"
               disabled={!hasDraft || (!editing && !packName.trim()) || approving || invalid}
               onClick={approve}
             >
               {approving ? (editing ? 'Approving…' : 'Publishing…') : editing ? 'Approve new version' : 'Publish'}
             </ActionButton>
-          </>
-        }
-      />
+          </div>
+        </div>
+        <div>
+          <Seg
+            options={[
+              { value: 'diagram', label: 'Diagram' },
+              { value: 'ports', label: 'Ports' },
+              { value: 'ledger', label: 'Ledger' },
+              { value: 'changes', label: 'Changes' },
+              { value: 'validation', label: 'Validation' },
+              { value: 'test', label: 'Test' },
+            ]}
+            value={view}
+            onChange={setView}
+          />
+        </div>
       </div>
       <div className="studio">
         <section className="st-pane pane-chat" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           <div className="pane-head">
             <h2>Build conversation</h2>
           </div>
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-[18px] py-4">
+          <div className="chat-scroll">
             {pending.length === 0 && (
               <EmptyState
                 title="Describe the review you need"
                 body="Tell the studio what documents you review and which fields must be extracted and verified — it drafts a Pack spec you can refine, then approve."
+                icon={<IconSparkle width={20} height={20} />}
               />
             )}
             {pending.map((line, index) => (
-              <article key={index} className={`max-w-2xl ${line.role === 'user' ? 'ml-auto text-right' : ''}`}>
-                <p className={`eyebrow ${line.role === 'assistant' ? 'text-accent' : ''}`}>
-                  {line.role === 'user' ? 'You' : 'Pack Studio'}
-                </p>
-                <p className="mt-1 whitespace-pre-line text-left text-[13px] leading-relaxed text-ink-2">
-                  {line.content}
-                </p>
-              </article>
+              <div key={index} className={`msg${line.role === 'user' ? ' me' : ''}`}>
+                {line.role === 'assistant' && (
+                  <span className="msg-av">
+                    <IconSparkle className="ic sm" />
+                  </span>
+                )}
+                <div className="msg-bubble" style={{ whiteSpace: 'pre-line' }}>{line.content}</div>
+              </div>
             ))}
           </div>
           <form
@@ -514,64 +517,84 @@ export function PackBuilderView({
               />
             ))}
           {view === 'ports' && (
-            <div className="overflow-auto p-6">
-              <p className="eyebrow mb-4">Data ports · what each step reads and writes</p>
-              <div className="grid border-l border-t-2 border-rule sm:grid-cols-2 xl:grid-cols-3">
-                {graph.nodes.map((node, index) => (
-                  <article key={node.id} className="border-b border-r border-rule bg-ground p-4">
-                    <p className="eyebrow text-accent">{String(index + 1).padStart(2, '0')} · {node.kind.replace('_', ' ')}</p>
-                    <h2 className="display mt-1 text-[16px]">{node.label}</h2>
-                    <p className="mt-3 font-data text-[11px] text-ink-2">{node.detail ?? 'Defined by the Pack spec'}</p>
-                  </article>
-                ))}
-              </div>
+            <div className="overflow-auto">
+              {graph.nodes.length === 0 ? (
+                <div className="p-6">
+                  <EmptyState
+                    title="No ports yet"
+                    body="Describe the review in the conversation — each document type, field and rule becomes a port here, showing what it reads and writes."
+                  />
+                </div>
+              ) : (
+                <div className="spec-list">
+                  <p className="eyebrow">Data ports · what each step reads and writes</p>
+                  {graph.nodes.map((node, index) => (
+                    <div key={node.id} className="spec-row">
+                      <span className="rid">{String(index + 1).padStart(2, '0')}</span>
+                      <div className="min-w-0 flex-1">
+                        <b>{node.label}</b>
+                        <p>{node.detail ?? `Defined by the Pack spec · ${node.kind.replace('_', ' ')}`}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
           {view === 'ledger' && (
             <div className="overflow-auto p-6">
               <p className="eyebrow mb-4">Ledger · execution order</p>
-              <ol className="border-t-2 border-rule">
-                {graph.nodes.map((node, index) => (
-                  <li key={node.id} className="grid grid-cols-[56px_1fr] gap-4 border-b border-rule py-4">
-                    <span className="display text-[26px] leading-none text-accent">{String(index + 1).padStart(2, '0')}</span>
-                    <span><strong className="display block text-[17px]">{node.label}</strong><span className="text-[12px] text-ink-2">{node.detail ?? node.kind.replace('_', ' ')}</span></span>
-                  </li>
-                ))}
-              </ol>
+              {graph.nodes.length === 0 ? (
+                <EmptyState
+                  title="Nothing to run yet"
+                  body="Describe the review in the conversation — the execution order appears here once the workflow has steps."
+                />
+              ) : (
+                <ol className="border-t-2 border-rule">
+                  {graph.nodes.map((node, index) => (
+                    <li key={node.id} className="flex gap-4 border-b border-rule py-4">
+                      <span className="w-14 flex-none text-2xl leading-none text-accent">{String(index + 1).padStart(2, '0')}</span>
+                      <span>
+                        <strong className="block text-lg">{node.label}</strong>
+                        <span className="text-sm text-ink-2">{node.detail ?? node.kind.replace('_', ' ')}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              )}
             </div>
           )}
           {view === 'changes' && (
-            <div className="overflow-auto p-6">
-              <p className="eyebrow mb-4">Changes · this revision vs its parent</p>
+            <div className="overflow-auto">
               {!revision || revision.diff.length === 0 ? (
-                <EmptyState
-                  title="No changes yet"
-                  body="This is the first revision of the session — there is no parent to diff against yet. Each accepted turn records its diff here."
-                />
+                <div className="p-6">
+                  <EmptyState
+                    title="No changes yet"
+                    body="This is the first revision of the session — there is no parent to diff against yet. Each accepted turn records its diff here."
+                  />
+                </div>
               ) : (
-                <ul className="divide-y divide-rule border-t-2 border-rule">
+                <div className="diff-list">
+                  <p className="eyebrow">Changes · this revision vs its parent</p>
                   {revision.diff.map((entry, index) => (
-                    <li key={index} className="py-3">
-                      <div className="flex items-center gap-2">
-                        <Tag
-                          variant={
-                            entry.op === 'add' ? 'accent' : entry.op === 'remove' ? 'danger' : 'warn'
-                          }
-                        >
-                          {entry.op}
-                        </Tag>
-                        <code className="font-data text-[12px] text-ink">{entry.path}</code>
+                    <div key={index} className="diff-row">
+                      <span className={`diff-ic ${entry.op === 'add' ? 'add' : entry.op === 'remove' ? 'rem' : 'mod'}`}>
+                        {entry.op === 'add' ? '+' : entry.op === 'remove' ? '−' : '~'}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <b className="font-data">{entry.path}</b>
+                        {entry.op === 'replace' && (
+                          <p>
+                            <span className="line-through">{JSON.stringify(entry.prev)}</span>
+                            {' → '}
+                            <span>{JSON.stringify(entry.next)}</span>
+                          </p>
+                        )}
                       </div>
-                      {entry.op === 'replace' && (
-                        <p className="mt-1.5 text-[12px] text-ink-2">
-                          <span className="line-through">{JSON.stringify(entry.prev)}</span>
-                          {' → '}
-                          <span>{JSON.stringify(entry.next)}</span>
-                        </p>
-                      )}
-                    </li>
+                      <span className="rid">{entry.op}</span>
+                    </div>
                   ))}
-                </ul>
+                </div>
               )}
             </div>
           )}
@@ -586,7 +609,7 @@ export function PackBuilderView({
               ) : revision.validation.ok ? (
                 <div className="border border-rule bg-surface p-4">
                   <Tag variant="accent">Valid</Tag>
-                  <p className="mt-2 text-[13px] leading-relaxed text-ink-2">
+                  <p className="mt-2 text-base leading-relaxed text-ink-2">
                     This revision passes workflow validation and can be approved or submitted for review.
                   </p>
                 </div>
@@ -597,14 +620,14 @@ export function PackBuilderView({
                   </Tag>
                   <ul className="mt-3 space-y-2">
                     {revision.validation.errors.map((err, index) => (
-                      <li key={index} className="border-l-[3px] border-missing-line bg-missing-soft px-3 py-2 text-[12.5px]">
+                      <li key={index} className="border-l-4 border-missing-line bg-missing-soft px-3 py-2 text-sm">
                         <span className="font-data font-medium text-missing">{err.code}</span>
-                        {err.path && <span className="ml-2 font-data text-[11px] text-ink-2">@{err.path}</span>}
+                        {err.path && <span className="ml-2 font-data text-xs text-ink-2">@{err.path}</span>}
                         <p className="leading-relaxed text-ink-2">{err.message}</p>
                       </li>
                     ))}
                   </ul>
-                  <p className="mt-3 text-[12px] text-missing">
+                  <p className="mt-3 text-sm text-missing">
                     Approval and review submission are disabled until these are resolved.
                   </p>
                 </div>
@@ -614,7 +637,7 @@ export function PackBuilderView({
           {view === 'test' && (
             <div className="overflow-auto p-6">
               <p className="eyebrow mb-1">Test · dry-run the draft against documents</p>
-              <p className="mb-4 text-[12.5px] leading-relaxed text-ink-2">
+              <p className="mb-4 text-sm leading-relaxed text-ink-2">
                 Run the current draft against uploaded documents to see what it would extract and verify before
                 freezing a version.
               </p>
@@ -631,18 +654,18 @@ export function PackBuilderView({
                       value={testDocIds}
                       onChange={setTestDocIds}
                       placeholder="Paste one or more document UUIDs, comma or space separated"
-                      className="min-w-[280px] flex-1"
+                      className="min-w-64 flex-1"
                     />
                     <ActionButton type="submit" variant="primary" disabled={!testDocIds.trim() || testing}>
                       {testing ? 'Running preview…' : 'Run preview'}
                     </ActionButton>
                   </form>
-                  {testError && <p className="mt-3 text-[12.5px] leading-relaxed text-missing">{testError}</p>}
+                  {testError && <p className="mt-3 text-sm leading-relaxed text-missing">{testError}</p>}
                   {previewResult && (
                     <div className="mt-4">
                       <p className="eyebrow mb-2">Extracted facts</p>
                       {previewResult.facts.length === 0 ? (
-                        <p className="text-[12.5px] text-ink-2">
+                        <p className="text-sm text-ink-2">
                           The preview produced no facts for those documents.
                         </p>
                       ) : (
@@ -650,7 +673,7 @@ export function PackBuilderView({
                           {previewResult.facts.map((fact, index) => (
                             <li key={index} className="py-3">
                               <div className="flex items-center gap-2">
-                                <span className="font-data text-[12.5px] text-ink">{fact.field}</span>
+                                <span className="font-data text-sm text-ink">{fact.field}</span>
                                 <Tag
                                   variant={
                                     fact.state === 'verified' ? 'accent' : fact.state === 'missing' ? 'danger' : 'warn'
@@ -659,9 +682,9 @@ export function PackBuilderView({
                                   {fact.state}
                                 </Tag>
                               </div>
-                              {fact.value !== null && <p className="mt-1 text-[12.5px] text-ink-2">{fact.value}</p>}
+                              {fact.value !== null && <p className="mt-1 text-sm text-ink-2">{fact.value}</p>}
                               {fact.citations.length > 0 && (
-                                <p className="mt-1 truncate text-[11.5px] text-ink-3" title={fact.citations[0].quote}>
+                                <p className="mt-1 truncate text-xs text-ink-3" title={fact.citations[0].quote}>
                                   “{fact.citations[0].quote}”
                                 </p>
                               )}
@@ -683,34 +706,35 @@ export function PackBuilderView({
           </div>
         </section>
 
-        <aside className="st-pane pane-insp" style={{ overflowY: 'auto' }}>
-          <div className="border-b border-rule px-4 py-3"><p className="eyebrow text-accent">Inspector</p></div>
-          <div className="space-y-5 p-4">
+        <aside className="st-pane pane-insp">
+          <div className="pane-head">
+            <h2>Inspector</h2>
+          </div>
+          <div className="insp-scroll">
             {!hasDraft ? (
-              <p className="text-[12.5px] leading-relaxed text-ink-2">Fields, document types and rules land here as the studio drafts them.</p>
+              <p className="text-sm leading-relaxed text-ink-2">Fields, document types and rules land here as the studio drafts them.</p>
             ) : selectedNode ? (
-              <section>
-                <CardKicker>{selectedNode.kind.replace('_', ' ')}</CardKicker>
-                <h2 className="display mt-1 text-[18px]">{selectedNode.label}</h2>
-                <p className="mt-3 border-l-[3px] border-rule bg-raised p-3 text-[12.5px] leading-relaxed text-ink-2">{selectedNode.detail ?? 'Defined by the current Pack draft.'}</p>
+              <section className="card insp-card">
+                <Tag variant="accent">{selectedNode.kind.replace('_', ' ')}</Tag>
+                <h3>{selectedNode.label}</h3>
+                <p className="desc">{selectedNode.detail ?? 'Defined by the current Pack draft.'}</p>
               </section>
             ) : (
               <>
                 <section>
                   <CardKicker>Pack contents</CardKicker>
-                  <p className="mt-2 text-[12.5px] leading-relaxed text-ink-2">Select a node to inspect it. The frozen Pack will contain the document types, fields and rules shown on the canvas.</p>
+                  <p className="mt-2 text-sm leading-relaxed text-ink-2">Select a node to inspect it. The frozen Pack will contain the document types, fields and rules shown on the canvas.</p>
                 </section>
                 <dl className="grid grid-cols-3 border-l border-t border-rule text-center">
-                  <div className="border-b border-r border-rule p-2"><dt className="eyebrow">Docs</dt><dd className="display mt-1 text-[20px]">{draft?.document_types.length ?? 0}</dd></div>
-                  <div className="border-b border-r border-rule p-2"><dt className="eyebrow">Fields</dt><dd className="display mt-1 text-[20px]">{draft?.fields.length ?? 0}</dd></div>
-                  <div className="border-b border-r border-rule p-2"><dt className="eyebrow">Rules</dt><dd className="display mt-1 text-[20px]">{draft?.rules.length ?? 0}</dd></div>
+                  <div className="border-b border-r border-rule p-2"><dt className="eyebrow">Docs</dt><dd className="mt-1 text-xl">{draft?.document_types.length ?? 0}</dd></div>
+                  <div className="border-b border-r border-rule p-2"><dt className="eyebrow">Fields</dt><dd className="mt-1 text-xl">{draft?.fields.length ?? 0}</dd></div>
+                  <div className="border-b border-r border-rule p-2"><dt className="eyebrow">Rules</dt><dd className="mt-1 text-xl">{draft?.rules.length ?? 0}</dd></div>
                 </dl>
               </>
             )}
-            <label htmlFor="pack-name" className="flbl">Pack name</label>
-            <input id="pack-name" value={packName} onChange={(event) => setPackName(event.target.value)} className="input" />
-            {error && <p className="text-[12px] text-missing">{error}</p>}
-            <p className="text-[10.5px] leading-relaxed text-ink-3">
+            <Input id="pack-name" label="Pack name" value={packName} onChange={setPackName} />
+            {error && <p className="text-sm text-missing">{error}</p>}
+            <p className="text-2xs leading-relaxed text-ink-3">
               {editing
                 ? 'Approving freezes a new version. Existing versions stay frozen; workspaces run the new one on their next run.'
                 : 'Publishing approves and installs version 1. Frozen versions are superseded, never edited in place.'}

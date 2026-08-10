@@ -95,7 +95,7 @@ export function NewWorkspaceWizard({ packs }: { packs: PackOut[] }) {
 
       {step === 0 && (
         <section className="mt-6">
-          <h2 className="page-title" style={{ fontSize: 17 }}>What are you trying to do?</h2>
+          <h2 className="page-title" style={{ fontSize: 'var(--t-xl)' }}>What are you trying to do?</h2>
           <p className="page-sub">A workspace starts from an objective. The packs follow from it.</p>
           <ul className="stack mt-6">
             {OBJECTIVES.map((o) => (
@@ -132,12 +132,12 @@ export function NewWorkspaceWizard({ packs }: { packs: PackOut[] }) {
 
       {step === 1 && (
         <section className="mt-6">
-          <h2 className="page-title" style={{ fontSize: 17 }}>Start {name} from</h2>
+          <h2 className="page-title" style={{ fontSize: 'var(--t-xl)' }}>Start {name} from</h2>
           <p className="page-sub"><IconLayers className="ic sm" /> A workspace is one Pack — pick a suggested Pack, search the marketplace, or build from scratch in chat.</p>
           <ul className="stack mt-6">
             <li><PickRow label="Blank Pack" detail="start Pack-less, build in chat" on={startFrom === 'blank'} onPick={() => setStartFrom('blank')} /></li>
             {importedSpec && (
-              <li><PickRow label={`Imported: ${importedSpec.name}`} detail="starting point only" on={startFrom === 'imported'} onPick={() => setStartFrom('imported')} /></li>
+              <li><PickRow label={`Imported: ${importedSpec.name}`} detail="not carried over automatically" on={startFrom === 'imported'} onPick={() => setStartFrom('imported')} /></li>
             )}
           </ul>
 
@@ -182,11 +182,15 @@ export function NewWorkspaceWizard({ packs }: { packs: PackOut[] }) {
       {step === 2 && (
         <section className="card card-pad mt-6 center" style={{ padding: 28 }}>
           <span className="e-ic" style={{ background: 'var(--ok-soft)', color: 'var(--ok)' }}><IconCheck className="ic lg" /></span>
-          <h2 className="page-title" style={{ fontSize: 18, marginTop: 12 }}>{name}</h2>
+          <h2 className="page-title" style={{ fontSize: 'var(--t-xl)', marginTop: 12 }}>{name}</h2>
           <p className="page-sub" style={{ marginTop: 8 }}>
-            {chosenPack
-              ? <>Workspace created with the <strong className="mono">{chosenPack.name}</strong> Pack installed. It is ready to run.</>
-              : <>Workspace created without a Pack. Build one in the studio or install a published Pack when you are ready.</>}
+            {chosenPack ? (
+              <>Creates the workspace with the <strong className="mono">{chosenPack.name}</strong> Pack installed, ready to run.</>
+            ) : startFrom === 'imported' ? (
+              <>Creates the workspace without a Pack — the imported spec is not carried over automatically. Build one from scratch or install a published Pack from there.</>
+            ) : (
+              <>Creates the workspace without a Pack. Build one from scratch or install a published Pack from there.</>
+            )}
           </p>
           {error && <p className="mt-3" style={{ color: 'var(--danger)' }}>{error}</p>}
           <div className="flbl-wrap" style={{ justifyContent: 'center', marginTop: 24 }}>

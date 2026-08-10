@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import type { ChatMessage, Fact, FactState, RunOut, RunStatus, WorkspaceSessionOut } from '@/lib/api';
 import { correctFactAction, deleteSessionAction, startRunAction, updateSessionAction, uploadDocumentAction } from '@/lib/session';
-import { ActionButton, EmptyState, Input, Pill, Tag, type PillTone } from '@/components/ui';
+import { ActionButton, EmptyState, Input, Pill, Progress, Tag, type PillTone } from '@/components/ui';
 import {
   IconAlert,
   IconArrowRight,
@@ -127,9 +127,9 @@ function FactRow({ fact, runId, workspaceId }: { fact: Fact; runId: string; work
       <div className="chk-side">
         <StatePill state={fact.state} />
         {correctable && !saved && (
-          <button type="button" className="btn ghost sm" onClick={() => setOpen((o) => !o)}>
+          <ActionButton size="sm" variant="ghost" onClick={() => setOpen((o) => !o)}>
             {open ? 'Close' : 'Correct'}
-          </button>
+          </ActionButton>
         )}
         {saved && <span className="chk-note">Logged</span>}
       </div>
@@ -338,15 +338,6 @@ export function SessionView({ workspaceId, workspaceName, session, run }: Sessio
           <ActionButton size="sm" variant="ghost" onClick={() => setIsRenaming((value) => !value)}>
             {isRenaming ? 'Cancel' : 'Rename'}
           </ActionButton>
-          <ActionButton
-            size="sm"
-            variant={!liveRun ? 'primary' : 'secondary'}
-            icon={!liveRun ? <IconPlay className="ic sm" /> : <IconRefresh className="ic sm" />}
-            onClick={() => void start()}
-            disabled={starting || running || !hasDocs}
-          >
-            {starting ? 'Starting…' : running ? 'Run in progress' : liveRun ? 'Re-run' : 'Start run'}
-          </ActionButton>
           <ActionButton size="sm" variant="danger" onClick={() => setIsDeleteOpen(true)}>
             Delete
           </ActionButton>
@@ -361,9 +352,7 @@ export function SessionView({ workspaceId, workspaceName, session, run }: Sessio
               <h3>Pipeline</h3>
               <span className="mono muted">{pipeTime}</span>
             </div>
-            <div className="pipe-progress">
-              <i style={{ width: `${progressPct}%` }} />
-            </div>
+            <Progress value={progressPct} />
             <ol className="stages">
               {RUN_STAGES.map((stage, index) => {
                 const done = finished || (activeIndex >= 0 && index < activeIndex);
@@ -397,11 +386,15 @@ export function SessionView({ workspaceId, workspaceName, session, run }: Sessio
                 ))}
               </ul>
             ) : (
-              <p className="muted" style={{ fontSize: 12, padding: '4px 16px 10px' }}>
+              <p className="fineprint" style={{ padding: '4px 16px 10px' }}>
                 No documents uploaded.
               </p>
             )}
             <form action={onUpload} style={{ padding: '0 12px 4px' }}>
+              {/* Hand-rolled: a <label> must wrap the hidden file input so a click opens the
+                  file picker. ActionButton renders a <button>, which cannot wrap-and-forward
+                  to an <input type="file">, so this stays a `.btn` label rather than the
+                  primitive. Report: ui.tsx has no upload/file-trigger primitive for this. */}
               <label className="btn secondary wfull" style={{ cursor: 'pointer' }}>
                 <IconPlus className="ic sm" />
                 Add documents
@@ -415,17 +408,32 @@ export function SessionView({ workspaceId, workspaceName, session, run }: Sessio
                 />
               </label>
             </form>
+            {/* The session's only run trigger. It previously sat in the page header;
+                moved here, beside the documents its `hasDocs`/disabled condition
+                depends on. */}
+            <div style={{ padding: '0 12px 12px' }}>
+              <ActionButton
+                size="md"
+                variant={!liveRun ? 'primary' : 'secondary'}
+                icon={!liveRun ? <IconPlay className="ic sm" /> : <IconRefresh className="ic sm" />}
+                onClick={() => void start()}
+                disabled={starting || running || !hasDocs}
+                className="wfull"
+              >
+                {starting ? 'Starting…' : running ? 'Run in progress' : liveRun ? 'Re-run' : 'Start run'}
+              </ActionButton>
+            </div>
           </div>
 
           {/* Ask about this run */}
           <div className="card">
             <div className="card-hd">
               <h3>Ask about this run</h3>
-              <IconSparkle className="ic sm" style={{ color: 'var(--ink-3)' }} />
+              <IconSparkle className="ic sm text-ink-3" />
             </div>
             <div className="ask-log">
               {renderedMessages.length === 0 ? (
-                <p className="muted" style={{ fontSize: 12 }}>
+                <p className="fineprint">
                   Ask where a result came from — answers cite the source span. The run itself never changes.
                 </p>
               ) : (
@@ -454,7 +462,10 @@ export function SessionView({ workspaceId, workspaceName, session, run }: Sessio
                 placeholder="e.g. where does the cap come from?"
                 aria-label="Ask about this run"
               />
-              <button className="iconbtn acc" type="submit" aria-label="Ask" disabled={!input.trim() || streaming} style={{ width: 30, height: 30 }}>
+              {/* Hand-rolled: `.iconbtn` is a distinct circular icon-only control, not part of
+                  the `.btn` family ActionButton wraps — no icon-only-button primitive exists
+                  in ui.tsx to convert this to. Report: candidate for an IconButton primitive. */}
+              <button className="iconbtn acc" type="submit" aria-label="Ask" disabled={!input.trim() || streaming}>
                 <IconArrowRight className="ic sm" />
               </button>
             </form>
@@ -464,7 +475,7 @@ export function SessionView({ workspaceId, workspaceName, session, run }: Sessio
         <section className="sess-content">
           <div className="seg" role="tablist" aria-label="Result surfaces" style={{ alignSelf: 'flex-start' }}>
             {SURFACE_TABS.map((tab) => (
-              <button key={tab.id} aria-pressed={surface === tab.id} onClick={() => setSurface(tab.id)}>
+              <button key={tab.id} type="button" aria-pressed={surface === tab.id} onClick={() => setSurface(tab.id)}>
                 {tab.icon}
                 {tab.label}
               </button>
@@ -477,7 +488,7 @@ export function SessionView({ workspaceId, workspaceName, session, run }: Sessio
                 <EmptyState
                   icon={<IconPlay className="ic lg" />}
                   title="No run yet"
-                  body="Upload the documents to review, then start the run. The Pack executes its six stages — classify, retrieve, extract, verify, cross-validate, report — and the extracted facts appear here with their citations."
+                  body="Add documents and start the run from the Documents panel. The Pack executes its six stages — classify, retrieve, extract, verify, cross-validate, report — and the extracted facts appear here with their citations."
                 />
               ) : running ? (
                 <EmptyState
@@ -489,7 +500,7 @@ export function SessionView({ workspaceId, workspaceName, session, run }: Sessio
                 <EmptyState
                   icon={<IconAlert className="ic lg" />}
                   title="The run did not complete"
-                  body="Check the uploaded documents and start the run again."
+                  body="Check the uploaded documents, then start the run again from the Documents panel."
                 />
               ) : showResults ? (
                 <>
@@ -519,7 +530,7 @@ export function SessionView({ workspaceId, workspaceName, session, run }: Sessio
                       <h3>Checklist results</h3>
                     </div>
                     {liveRun.cases.length === 0 && facts.length === 0 ? (
-                      <p className="muted" style={{ fontSize: 12, padding: '12px 16px' }}>
+                      <p className="fineprint" style={{ padding: '12px 16px' }}>
                         This run extracted no fields — check the Pack’s spec and the documents.
                       </p>
                     ) : (
@@ -532,7 +543,7 @@ export function SessionView({ workspaceId, workspaceName, session, run }: Sessio
                               <span className="grp-meta">{caseFacts.length} field{caseFacts.length === 1 ? '' : 's'}</span>
                             </div>
                             {caseFacts.length === 0 ? (
-                              <p className="muted" style={{ fontSize: 12, padding: '4px 16px 10px' }}>
+                              <p className="fineprint" style={{ padding: '4px 16px 10px' }}>
                                 No facts for this case.
                               </p>
                             ) : (
@@ -550,9 +561,9 @@ export function SessionView({ workspaceId, workspaceName, session, run }: Sessio
                   <div className="card">
                     <div className="card-hd">
                       <h3>Correction ledger</h3>
-                      <span className="muted" style={{ fontSize: 11.5 }}>Logged, never silently applied</span>
+                      <span className="muted text-xs">Logged, never silently applied</span>
                     </div>
-                    <p className="muted" style={{ fontSize: 12.5, padding: '14px 16px', margin: 0 }}>
+                    <p className="fineprint" style={{ padding: '14px 16px', margin: 0 }}>
                       Corrections are logged as they’re made; a read-back view is coming. Each correction feeds the next Pack draft.
                     </p>
                   </div>
@@ -605,7 +616,7 @@ export function SessionView({ workspaceId, workspaceName, session, run }: Sessio
             }}
           >
             <div className="modal-hd">
-              <p className="eyebrow" style={{ color: 'var(--danger)' }}>Destructive action</p>
+              <p className="eyebrow text-missing">Destructive action</p>
               <h2 id="delete-session-title">Delete this session?</h2>
             </div>
             <div className="modal-bd">

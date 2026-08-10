@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { PackBuilderView } from '@/components/PackBuilderView';
 import { ApiError, getPack, getWorkspace } from '@/lib/api';
 import { Button, Card, CardHeader, PageHeader, Tag } from '@/components/ui';
+import { formatDate } from '@/lib/format';
 
 function RowList({ children }: { children: React.ReactNode }) {
   return <ul className="rows">{children}</ul>;
@@ -105,7 +106,7 @@ export default async function PackBuilderPage({
                   {[...detail.versions].reverse().map((version) => (
                     <li key={version.id} className="row-2">
                       <span className="mono">Version {version.version}{version.version === workspace.pack_version ? ' · installed' : ''}</span>
-                      <span className="row-sub">{new Date(version.created_at).toLocaleDateString()}</span>
+                      <span className="row-sub">{formatDate(version.created_at)}</span>
                     </li>
                   ))}
                 </RowList>

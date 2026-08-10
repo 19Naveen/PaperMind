@@ -15,6 +15,7 @@ import {
   submitReviewAction,
 } from '@/lib/session';
 import { ActionButton, Panel, Tag } from '@/components/ui';
+import { formatDate, formatDateTime } from '@/lib/format';
 
 const ENV_ORDER: ReleaseEnvironment[] = ['development', 'staging', 'production'];
 
@@ -22,6 +23,7 @@ function shortId(id: string | null): string {
   return id ? id.slice(0, 8) : '—';
 }
 
+/** Singapore-style date: DD/MM/YYYY. */
 type ActionOutcome<T> = { ok: true; data: T } | { ok: false; code: string; message: string };
 
 /** The governance / release lifecycle panel for a Pack's marketplace detail page.
@@ -79,11 +81,11 @@ export function ReleasePanel({
 
       <Panel title="Review" count={reviews?.length ?? 0}>
         {reviewsError ? (
-          <p className="text-[12.5px] leading-relaxed text-missing">{reviewsError}</p>
+          <p className="text-sm leading-relaxed text-missing">{reviewsError}</p>
         ) : (
           <>
             {reviews && reviews.length === 0 && (
-              <p className="text-[12.5px] leading-relaxed text-ink-2">
+              <p className="text-sm leading-relaxed text-ink-2">
                 No reviews submitted yet.
               </p>
             )}
@@ -92,9 +94,9 @@ export function ReleasePanel({
                 {reviews.map((review) => (
                   <li key={review.id} className="flex items-center justify-between gap-3 py-2.5">
                     <div className="min-w-0">
-                      <p className="font-data text-[12px] text-ink">revision {shortId(review.revision_id)}</p>
-                      <p className="text-[11px] text-ink-3">
-                        {new Date(review.submitted_at).toLocaleDateString()}
+                      <p className="font-data text-sm text-ink">revision {shortId(review.revision_id)}</p>
+                      <p className="text-xs text-ink-3">
+                        {formatDate(review.submitted_at)}
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-1.5">
@@ -132,7 +134,7 @@ export function ReleasePanel({
             )}
             {revisionId ? (
               <div className="mt-3 border-t border-rule pt-3">
-                <p className="mb-2 text-[12px] leading-relaxed text-ink-2">
+                <p className="mb-2 text-sm leading-relaxed text-ink-2">
                   Submit draft revision <span className="font-data">{shortId(revisionId)}</span> for review.
                 </p>
                 <ActionButton
@@ -145,7 +147,7 @@ export function ReleasePanel({
                 </ActionButton>
               </div>
             ) : (
-              <p className="mt-3 border-t border-rule pt-3 text-[12px] leading-relaxed text-ink-3">
+              <p className="mt-3 border-t border-rule pt-3 text-sm leading-relaxed text-ink-3">
                 No draft revision is open on this page. Author a draft in the studio, then submit it for review here.
               </p>
             )}
@@ -155,7 +157,7 @@ export function ReleasePanel({
 
       <Panel title="Promote" count={latestVersionId ? `v${latestVersion}` : undefined}>
         {!latestVersionId ? (
-          <p className="text-[12.5px] leading-relaxed text-ink-2">
+          <p className="text-sm leading-relaxed text-ink-2">
             No frozen version to promote yet — approve a version first.
           </p>
         ) : (
@@ -178,7 +180,7 @@ export function ReleasePanel({
               })}
             </div>
             {releasedTo.size > 0 && promoteTarget !== null && (
-              <p className="mt-2 text-[11.5px] leading-relaxed text-ink-3">
+              <p className="mt-2 text-xs leading-relaxed text-ink-3">
                 Promotion is forward-only: {promoteTarget} needs the prior environment released for this version first.
               </p>
             )}
@@ -188,20 +190,20 @@ export function ReleasePanel({
 
       <Panel title="Release history" count={releases?.length ?? 0}>
         {releasesError ? (
-          <p className="text-[12.5px] leading-relaxed text-missing">{releasesError}</p>
+          <p className="text-sm leading-relaxed text-missing">{releasesError}</p>
         ) : releases && releases.length === 0 ? (
-          <p className="text-[12.5px] leading-relaxed text-ink-2">No releases recorded yet.</p>
+          <p className="text-sm leading-relaxed text-ink-2">No releases recorded yet.</p>
         ) : (
           <ul className="divide-y divide-rule">
             {releases?.map((release) => (
               <li key={release.id} className="flex items-center justify-between gap-3 py-2.5">
                 <div className="min-w-0">
-                  <p className="flex items-center gap-2 font-data text-[12px] text-ink">
+                  <p className="flex items-center gap-2 font-data text-sm text-ink">
                     <Tag variant="outline">{release.environment}</Tag>
                     {release.action}
                   </p>
-                  <p className="mt-0.5 text-[11px] text-ink-3">
-                    {new Date(release.created_at).toLocaleString()}
+                  <p className="mt-0.5 text-xs text-ink-3">
+                    {formatDateTime(release.created_at)}
                   </p>
                 </div>
                 <ActionButton
@@ -220,22 +222,22 @@ export function ReleasePanel({
 
       <Panel title="Audit trail" count={audit?.length ?? 0}>
         {auditError ? (
-          <p className="text-[12.5px] leading-relaxed text-missing">{auditError}</p>
+          <p className="text-sm leading-relaxed text-missing">{auditError}</p>
         ) : audit && audit.length === 0 ? (
-          <p className="text-[12.5px] leading-relaxed text-ink-2">No audit events yet.</p>
+          <p className="text-sm leading-relaxed text-ink-2">No audit events yet.</p>
         ) : (
           <ul className="divide-y divide-rule">
             {audit?.map((event) => (
               <li key={event.id} className="flex items-start justify-between gap-3 py-2">
                 <div className="min-w-0">
-                  <p className="font-data text-[12px] text-ink">{event.event_type}</p>
-                  <p className="text-[11px] text-ink-3">
+                  <p className="font-data text-sm text-ink">{event.event_type}</p>
+                  <p className="text-xs text-ink-3">
                     {event.environment ? `${event.environment} · ` : ''}
-                    {new Date(event.created_at).toLocaleString()}
+                    {formatDateTime(event.created_at)}
                   </p>
                 </div>
                 {event.release_id && (
-                  <span className="shrink-0 font-data text-[10px] text-ink-3">rel {shortId(event.release_id)}</span>
+                  <span className="shrink-0 font-data text-2xs text-ink-3">rel {shortId(event.release_id)}</span>
                 )}
               </li>
             ))}
@@ -243,7 +245,7 @@ export function ReleasePanel({
         )}
       </Panel>
 
-      {error && <p className="text-[12.5px] leading-relaxed text-missing">{error}</p>}
+      {error && <p className="text-sm leading-relaxed text-missing">{error}</p>}
     </div>
   );
 }

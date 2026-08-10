@@ -5,6 +5,7 @@ import { useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import type { WorkspaceDetailOut, WorkspaceSessionOut } from '@/lib/api';
 import { createSessionAction, deleteWorkspaceAction, updateWorkspaceAction } from '@/lib/session';
+import { formatDate } from '@/lib/format';
 import { ActionButton, Button, EmptyState, Input, PageHeader, Pill, Seg, Stat, Tag, type PillTone } from '@/components/ui';
 import {
   IconAlert,
@@ -29,6 +30,15 @@ const STATUS_TONE: Record<SessionStatus, PillTone> = {
   failed: 'missing',
 };
 
+/** Human-readable label per status — the one vocabulary shared with SessionView's run pill. */
+const STATUS_LABEL: Record<SessionStatus, string> = {
+  draft: 'Draft',
+  pending: 'Pending',
+  running: 'Running',
+  complete: 'Complete',
+  failed: 'Failed',
+};
+
 /** sess-ic tint + glyph per status. The CSS only ships `.done`/`.run`/`.warn`
  * variants, so the dormant states (draft/pending) take a muted inline chip. */
 const STATUS_ICON: Record<SessionStatus, { icon: ReactNode; cls: string }> = {
@@ -38,10 +48,6 @@ const STATUS_ICON: Record<SessionStatus, { icon: ReactNode; cls: string }> = {
   complete: { icon: <IconCheck className="ic sm" />, cls: 'done' },
   failed: { icon: <IconAlert className="ic sm" />, cls: 'warn' },
 };
-
-function fmtDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}
 
 function SessionRow({ session, workspaceId }: { session: WorkspaceSessionOut; workspaceId: string }) {
   const status = session.status as SessionStatus;
@@ -68,9 +74,9 @@ function SessionRow({ session, workspaceId }: { session: WorkspaceSessionOut; wo
         </span>
         <span className="sess-sub">{subject}</span>
       </span>
-      <span className="sess-flag">{fmtDate(session.updated_at)}</span>
+      <span className="sess-flag">{formatDate(session.updated_at)}</span>
       <Pill tone={STATUS_TONE[status]} dot={status === 'running'}>
-        {status}
+        {STATUS_LABEL[status]}
       </Pill>
       <span className="sess-chev">
         <IconChevronRight className="ic sm" />

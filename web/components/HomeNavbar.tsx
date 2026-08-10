@@ -29,12 +29,12 @@ export function HomeNavbar({ onOpenNavigation }: { onOpenNavigation?: () => void
         <span aria-current="page">{crumb}</span>
       </nav>
       <div className="top-actions">
-        <span className="searchbtn" aria-label="Search will be available soon">
+        <span className="searchbtn" role="button" aria-disabled="true" aria-label="Search will be available soon">
           <IconSearch className="ic sm" />
           <span className="lbl">Search</span>
           <kbd>⌘K</kbd>
         </span>
-        <span className="iconbtn" aria-label="Notifications will be available soon" style={{ cursor: 'default' }}>
+        <span className="iconbtn" role="button" aria-disabled="true" aria-label="Notifications will be available soon" style={{ cursor: 'default' }}>
           <IconBell className="ic" />
         </span>
         <HomeAccountMenu />

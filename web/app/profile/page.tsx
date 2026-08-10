@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getMe } from '@/lib/api';
 import { signOutAction } from '@/lib/session';
+import { ActionButton, Avatar } from '@/components/ui';
 import { ProfileStats } from './ProfileStats';
 
 // Server-safe initials (AuthProvider's initialsOf is client-only).
@@ -23,7 +24,7 @@ export default async function ProfilePage() {
         </div>
         <div className="page-actions">
           <form action={signOutAction}>
-            <button type="submit" className="btn danger">Sign out</button>
+            <ActionButton type="submit" variant="danger">Sign out</ActionButton>
           </form>
         </div>
       </div>
@@ -31,7 +32,7 @@ export default async function ProfilePage() {
       <div className="set-grid">
         <div className="card set-card">
           <div className="prof-head">
-            <span className="avatar xl">{initialsOf(user.name)}</span>
+            <Avatar initials={initialsOf(user.name)} className="xl" />
             <div className="prof-id">
               <h1>
                 {user.name} <span className="tag acc">{roleLabel}</span>
@@ -55,7 +56,7 @@ export default async function ProfilePage() {
             <h3>Your contributions</h3>
           </div>
           <ProfileStats />
-          <p className="muted" style={{ padding: '13px 16px', fontSize: 12.5, lineHeight: 1.5, margin: 0 }}>
+          <p className="fineprint px-4 py-3">
             Per-pack contribution history isn&rsquo;t available yet — your published packs and runs will appear
             here once the API exposes them.
           </p>

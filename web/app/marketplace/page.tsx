@@ -1,6 +1,7 @@
 import { getMe, listPacks } from '@/lib/api';
 import { redirect } from 'next/navigation';
-import { PageHeader } from '@/components/ui';
+import { EmptyState, PageHeader } from '@/components/ui';
+import { IconLibrary } from '@/lib/icons';
 import { MarketGrid } from './MarketGrid';
 
 export default async function MarketplacePage() {
@@ -12,11 +13,11 @@ export default async function MarketplacePage() {
     return (
       <section className="page">
         <PageHeader eyebrow="Marketplace" title="Published packs" />
-        <div className="card empty">
-          <span className="e-ic">📭</span>
-          <h3>No packs to install yet</h3>
-          <p>Author a Pack from any workspace, approve it, and it becomes installable here.</p>
-        </div>
+        <EmptyState
+          icon={<IconLibrary className="ic lg" />}
+          title="No packs to install yet"
+          body="Author a Pack from any workspace, approve it, and it becomes installable here."
+        />
       </section>
     );
   }

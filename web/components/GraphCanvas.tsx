@@ -22,6 +22,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import type { FlowEdge, FlowNode, NodeKind } from '@/lib/types';
 import { IconSparkle } from '@/lib/icons';
+import { ActionButton, EmptyState } from '@/components/ui';
 import { DocTypeNode, FieldNode, RuleNode, type GraphNodeData } from './graph/nodes';
 
 const nodeTypes = { document_type: DocTypeNode, field: FieldNode, rule: RuleNode };
@@ -209,7 +210,7 @@ function Canvas({
   }, [edges, setRfEdges]);
 
   return (
-    <div className="relative min-w-0 flex-1 bg-ground">
+    <div className="pm-graph relative min-w-0 flex-1 bg-ground">
       <ReactFlow
         nodes={rfNodes}
         edges={rfEdges}
@@ -228,43 +229,36 @@ function Canvas({
       >
         <Background
           variant={BackgroundVariant.Dots}
-          color="color-mix(in srgb, #201e1d 22%, transparent)"
+          color="color-mix(in srgb, var(--color-ink-3) 22%, transparent)"
           gap={28}
           size={1}
         />
-        <Controls showInteractive={!readOnly} className="!border !border-rule !bg-surface !shadow-sm [&_button]:!border-rule [&_button]:!bg-surface [&_button]:!text-ink [&_button:hover]:!bg-raised [&_svg]:!fill-ink" />
+        <Controls showInteractive={!readOnly} />
         {!readOnly && <Panel position="top-left">
           <div className="flex gap-1.5 border border-rule bg-surface p-1.5 shadow-sm">
-            <button
-              onClick={() => addNode('document_type')}
-              className="border border-rule px-2 py-1 text-[12px] text-ink hover:border-accent hover:text-accent"
-            >
+            <ActionButton variant="outline" size="sm" onClick={() => addNode('document_type')}>
               + Document type
-            </button>
-            <button
-              onClick={() => addNode('field')}
-              className="border border-rule px-2 py-1 text-[12px] text-ink hover:border-accent hover:text-accent"
-            >
+            </ActionButton>
+            <ActionButton variant="outline" size="sm" onClick={() => addNode('field')}>
               + Field
-            </button>
-            <button
-              onClick={() => addNode('rule')}
-              className="border border-rule px-2 py-1 text-[12px] text-ink hover:border-accent hover:text-accent"
-            >
+            </ActionButton>
+            <ActionButton variant="outline" size="sm" onClick={() => addNode('rule')}>
               + Rule
-            </button>
+            </ActionButton>
           </div>
         </Panel>}
         {nodes.length === 0 && (
           <Panel position="top-center">
-            <div className="mt-24 flex max-w-xs flex-col items-center border border-dashed border-rule bg-surface px-6 py-6 text-center shadow-sm">
-              <span className="flex h-10 w-10 items-center justify-center border border-rule bg-raised text-ink-2">
-                <IconSparkle width={16} height={16} />
-              </span>
-              <p className="display mt-3 text-[14px] text-ink">Nothing to show yet</p>
-              <p className="mt-1 text-[12.5px] leading-relaxed text-ink-2">
-                Describe the Pack in the chat, or add a node here directly.
-              </p>
+            <div className="mx-auto mt-16 max-w-sm">
+              <EmptyState
+                title="Nothing to show yet"
+                body={
+                  readOnly
+                    ? 'Describe the Pack in the conversation — nodes appear here as the studio drafts them.'
+                    : 'Describe the Pack in the chat, or add a node here directly.'
+                }
+                icon={<IconSparkle width={18} height={18} />}
+              />
             </div>
           </Panel>
         )}

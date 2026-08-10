@@ -149,6 +149,87 @@ export function ActionButton({
   );
 }
 
+/**
+ * Icon-only square button (`.iconbtn`) — a different control family from `.btn`,
+ * so it is its own primitive rather than a `Button` variant. `label` is
+ * required: an icon with no accessible name is invisible to a screen reader.
+ */
+export function IconButton({
+  icon,
+  label,
+  onClick,
+  type = 'button',
+  variant = 'default',
+  disabled,
+  className = '',
+}: {
+  icon: ReactNode;
+  label: string;
+  onClick?: () => void;
+  type?: 'button' | 'submit';
+  variant?: 'default' | 'accent';
+  disabled?: boolean;
+  className?: string;
+}) {
+  return (
+    <button
+      type={type}
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      title={label}
+      className={`iconbtn${variant === 'accent' ? ' acc' : ''} ${className}`.trim()}
+    >
+      {icon}
+    </button>
+  );
+}
+
+/**
+ * File-picker trigger styled as a button. This has to be a `<label>` wrapping a
+ * hidden `<input type="file">` — a `<button>` cannot forward its click to a
+ * nested file input, so `ActionButton` can't serve this case.
+ */
+export function FileButton({
+  children,
+  onFiles,
+  accept,
+  multiple = false,
+  disabled = false,
+  variant = 'secondary',
+  size = 'md',
+  icon,
+  className = '',
+}: {
+  children: ReactNode;
+  onFiles: (files: FileList) => void;
+  accept?: string;
+  multiple?: boolean;
+  disabled?: boolean;
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  icon?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <label className={`${btnClass(variant, size, className)}${disabled ? ' disabled' : ''}`}>
+      {icon}
+      {children}
+      <input
+        type="file"
+        accept={accept}
+        multiple={multiple}
+        disabled={disabled}
+        className="sr-only"
+        onChange={(e) => {
+          if (e.target.files?.length) onFiles(e.target.files);
+          e.target.value = '';
+        }}
+      />
+    </label>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Cards and surfaces — .card / .card-hd.
 // ---------------------------------------------------------------------------
@@ -265,9 +346,28 @@ export function Seg<T extends string>({ options, value, onChange }: { options: {
 // Empty state — .card.empty.
 // ---------------------------------------------------------------------------
 
-export function EmptyState({ title, body, action, icon }: { title: string; body: string; action?: ReactNode; icon?: ReactNode }) {
+/**
+ * An empty screen is an invitation to act: say what will fill the space and
+ * give the action that fills it. `span` makes it stretch every column of a
+ * parent grid instead of sitting in one card-width cell.
+ */
+export function EmptyState({
+  title,
+  body,
+  action,
+  icon,
+  span = false,
+  className = '',
+}: {
+  title: string;
+  body: string;
+  action?: ReactNode;
+  icon?: ReactNode;
+  span?: boolean;
+  className?: string;
+}) {
   return (
-    <div className="card empty">
+    <div className={`card empty ${className}`.trim()} style={span ? { gridColumn: '1 / -1' } : undefined}>
       {icon && <span className="e-ic">{icon}</span>}
       <h3>{title}</h3>
       <p>{body}</p>
@@ -298,10 +398,36 @@ export function Stat({ label, value, tone = 'default', sub, bare = false }: { la
       {sub && <div className="s-d">{sub}</div>}
     </>
   );
+  // `.stat:first-child` drops the dividing rule, so a lone stat inside a card
+  // needs no override.
   if (bare) return <div className="stat">{cell}</div>;
   return (
     <div className="card">
-      <div className="stat" style={{ borderLeft: 0 }}>{cell}</div>
+      <div className="stat">{cell}</div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Stamp — the provenance voice. Monospace, uppercase, tabular: versions, rule
+// ids, document references, run timestamps. Use it wherever a value is meant to
+// be read as machine-recorded fact rather than prose.
+// ---------------------------------------------------------------------------
+
+export function Stamp({ children, className = '' }: { children: ReactNode; className?: string }) {
+  return <span className={`stamp ${className}`.trim()}>{children}</span>;
+}
+
+// ---------------------------------------------------------------------------
+// Section heading — `.sec-head` with an optional count.
+// ---------------------------------------------------------------------------
+
+export function SectionHeader({ title, count, action }: { title: string; count?: number | string; action?: ReactNode }) {
+  return (
+    <div className="sec-head">
+      <h2>{title}</h2>
+      {count !== undefined && <span className="count">{String(count)}</span>}
+      {action && <span style={{ marginLeft: 'auto' }}>{action}</span>}
     </div>
   );
 }
@@ -323,13 +449,15 @@ export function Kv({ k, v }: { k: string; v: ReactNode }) {
 // Status pill — .pill with a dot.
 // ---------------------------------------------------------------------------
 
-export type PillTone = 'running' | 'verified' | 'missing' | 'neutral' | 'accent';
+export type PillTone = 'running' | 'verified' | 'unsupported' | 'missing' | 'neutral' | 'accent' | 'outline';
 const PILL_V: Record<PillTone, string> = {
   running: 'run',
   verified: 'ok',
+  unsupported: 'warn',
   missing: 'dgr',
   neutral: 'neutral',
   accent: 'run',
+  outline: 'outl',
 };
 
 export function Pill({ tone = 'neutral', children, dot }: { tone?: PillTone; children: ReactNode; dot?: boolean }) {

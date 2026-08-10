@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import type { PackOut } from '@/lib/api';
-import { PageHeader } from '@/components/ui';
+import { EmptyState, PageHeader } from '@/components/ui';
 import { IconSearch } from '@/lib/icons';
 
 /** One line answering "what does this Pack do" — what it reviews and extracts. */
@@ -59,11 +59,11 @@ export function MarketGrid({ packs }: { packs: PackOut[] }) {
           </Link>
         ))}
         {filtered.length === 0 && (
-          <div className="card empty">
-            <span className="e-ic"><IconSearch className="ic lg" /></span>
-            <h3>No packs match “{query}”</h3>
-            <p>Try a different term — or author a pack for this workflow yourself.</p>
-          </div>
+          <EmptyState
+            icon={<IconSearch className="ic lg" />}
+            title={`No packs match "${query}"`}
+            body="Try a different term — or author a pack for this workflow yourself."
+          />
         )}
       </div>
     </section>

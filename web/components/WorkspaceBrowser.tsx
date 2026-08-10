@@ -3,7 +3,9 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { WorkspaceDetailOut } from '@/lib/api';
-import { IconArrowRight, IconClock, IconDoc, IconLayers, IconSearch } from '@/lib/icons';
+import { Button, EmptyState, Pill, Tag, type PillTone } from '@/components/ui';
+import { IconArrowRight, IconClock, IconDoc, IconLayers, IconPlus, IconSearch } from '@/lib/icons';
+import { formatDate } from '@/lib/format';
 
 export interface RecentSession {
   id: string;
@@ -14,21 +16,22 @@ export interface RecentSession {
   updatedAt: string;
 }
 
-function dateLabel(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Unknown date';
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}
-
-function statusLabel(status: string): string {
-  return status.replace(/_/g, ' ');
-}
-
-function dotClass(status: string): string {
-  if (status === 'failed') return 'warn';
-  if (status === 'complete') return 'acc';
-  return 'acc';
-}
+/** One status vocabulary (Pill), shared in spirit with WorkspaceView/SessionView.
+ * `status` is a loose string on the wire, so both maps fall back gracefully. */
+const STATUS_TONE: Record<string, PillTone> = {
+  draft: 'neutral',
+  pending: 'neutral',
+  running: 'running',
+  complete: 'verified',
+  failed: 'missing',
+};
+const STATUS_LABEL: Record<string, string> = {
+  draft: 'Draft',
+  pending: 'Pending',
+  running: 'Running',
+  complete: 'Complete',
+  failed: 'Failed',
+};
 
 function actClass(status: string): string {
   if (status === 'failed') return 'warn';
@@ -76,7 +79,7 @@ export function WorkspaceBrowser({
 
         <div className="ws-grid">
           {filtered.map((workspace) => {
-            const updated = dateLabel(workspace.updated_at);
+            const updated = formatDate(workspace.updated_at, 'Unknown date');
             const sessions = workspace.session_count;
             const docs = workspace.assets.length;
             const completed = workspace.sessions.filter((s) => s.status === 'complete').length;
@@ -85,7 +88,7 @@ export function WorkspaceBrowser({
               <Link key={workspace.id} href={`/workspace/${workspace.id}`} className="card ws-card">
                 <div className="ws-top">
                   <h3>{workspace.name}</h3>
-                  <span className={`tag ${workspace.pack_id ? 'acc' : 'out'}`}>{workspace.pack_id ? 'Active' : 'Draft'}</span>
+                  <Tag variant={workspace.pack_id ? 'accent' : 'outline'}>{workspace.pack_id ? 'Active' : 'Draft'}</Tag>
                 </div>
                 <p className="ws-pack">
                   <IconLayers className="ic sm" />
@@ -94,13 +97,19 @@ export function WorkspaceBrowser({
                 </p>
                 <p className="ws-desc">{workspace.goal || 'No workspace goal has been set yet.'}</p>
                 <div className="ws-meta">
-                  <span className="sp"><IconDoc className="ic sm" /> {docs} doc{docs === 1 ? '' : 's'}</span>
-                  <span className="sp"><IconClock className="ic sm" /> {sessions} session{sessions === 1 ? '' : 's'}</span>
-                  {sessions > 0 && (
+                  {docs > 0 || sessions > 0 ? (
                     <>
-                      <span className="ws-bar" aria-label={`${progress}% executed`}><i style={{ width: `${progress}%` }} /></span>
-                      <span className="mono">{progress}%</span>
+                      <span className="sp"><IconDoc className="ic sm" /> {docs} doc{docs === 1 ? '' : 's'}</span>
+                      <span className="sp"><IconClock className="ic sm" /> {sessions} session{sessions === 1 ? '' : 's'}</span>
+                      {sessions > 0 && (
+                        <>
+                          <span className="ws-bar" aria-label={`${progress}% executed`}><i style={{ width: `${progress}%` }} /></span>
+                          <span className="mono">{progress}%</span>
+                        </>
+                      )}
                     </>
+                  ) : (
+                    <span className="sp muted">Not started yet</span>
                   )}
                 </div>
                 <div className="ws-foot">
@@ -111,10 +120,22 @@ export function WorkspaceBrowser({
             );
           })}
           {filtered.length === 0 && (
-            <div className="card empty">
-              <span className="e-ic"><IconSearch className="ic lg" /></span>
-              <h3>No workspaces match “{query}”</h3>
-              <p>Try a different filter, or create a new workspace.</p>
+            <div style={{ gridColumn: '1 / -1' }}>
+              {workspaces.length === 0 ? (
+                <EmptyState
+                  icon={<IconLayers className="ic lg" />}
+                  title="No workspaces yet"
+                  body="Create a workspace to install a Pack and start running sessions against your documents."
+                  action={<Button href="/workspace/new" variant="primary" icon={<IconPlus className="ic sm" />}>New workspace</Button>}
+                />
+              ) : (
+                <EmptyState
+                  icon={<IconSearch className="ic lg" />}
+                  title={`No workspaces match “${query}”`}
+                  body="Try a different filter, or create a new workspace."
+                  action={<Button href="/workspace/new" variant="secondary">New workspace</Button>}
+                />
+              )}
             </div>
           )}
         </div>
@@ -124,16 +145,20 @@ export function WorkspaceBrowser({
         <section className="card" aria-labelledby="review-heading">
           <div className="card-hd">
             <h3 id="review-heading">Needs your review</h3>
-            {reviewSessions.length > 0 && <span className="tag out">{reviewSessions.length}</span>}
+            {reviewSessions.length > 0 && <Tag variant="outline">{reviewSessions.length}</Tag>}
           </div>
           <div className="queue">
             {reviewSessions.length > 0 ? (
               reviewSessions.map((session) => (
                 <Link key={`${session.workspaceId}:${session.id}`} className="q-item" href={`/workspace/${session.workspaceId}/sessions/${session.id}`}>
-                  <span className={`q-dot ${dotClass(session.status)}`} />
                   <span className="q-main">
                     <b>{session.title}</b>
-                    <small>{session.workspaceName} · {statusLabel(session.status)}</small>
+                    <small>
+                      {session.workspaceName} ·{' '}
+                      <Pill tone={STATUS_TONE[session.status] ?? 'neutral'} dot={session.status === 'running'}>
+                        {STATUS_LABEL[session.status] ?? session.status}
+                      </Pill>
+                    </small>
                   </span>
                   <span className="q-go">Review</span>
                 </Link>
@@ -153,9 +178,14 @@ export function WorkspaceBrowser({
                   <span className={`act-ic ${actClass(session.status)}`}><IconClock className="ic sm" /></span>
                   <div>
                     <Link href={`/workspace/${session.workspaceId}/sessions/${session.id}`}>{session.title}</Link>
-                    <p>{session.workspaceName} · {statusLabel(session.status)}</p>
+                    <p>
+                      {session.workspaceName} ·{' '}
+                      <Pill tone={STATUS_TONE[session.status] ?? 'neutral'} dot={session.status === 'running'}>
+                        {STATUS_LABEL[session.status] ?? session.status}
+                      </Pill>
+                    </p>
                   </div>
-                  <time dateTime={session.updatedAt} style={{ marginLeft: 'auto' }}>{dateLabel(session.updatedAt)}</time>
+                  <time dateTime={session.updatedAt} style={{ marginLeft: 'auto' }}>{formatDate(session.updatedAt, 'Unknown date')}</time>
                 </li>
               ))}
             </ol>
