@@ -1,11 +1,12 @@
 import { redirect } from 'next/navigation';
 import { getMe, getWorkspace, listWorkspaces } from '@/lib/api';
 import { WorkspaceBrowser, type RecentSession } from '@/components/WorkspaceBrowser';
-import { Button, PageHeader, Stat } from '@/components/ui';
-import { IconPlus } from '@/lib/icons';
+import { Button, EmptyState, PageHeader, Stat } from '@/components/ui';
+import { hourInSingapore } from '@/lib/format';
+import { IconAlert, IconPlus } from '@/lib/icons';
 
-function greetingFor(date = new Date()): string {
-  const hour = date.getHours();
+function greetingFor(): string {
+  const hour = hourInSingapore();
   if (hour < 12) return 'Good morning';
   if (hour < 18) return 'Good afternoon';
   return 'Good evening';
@@ -14,9 +15,30 @@ function greetingFor(date = new Date()): string {
 export default async function HomePage() {
   const user = await getMe();
   if (!user) redirect('/login');
-  const workspaces = await listWorkspaces();
+
+  // The workspace list is this page. If it can't be read, say so — rendering the
+  // shell with zeros would report an empty portfolio, which is a different and
+  // untrue statement.
+  const workspaces = await listWorkspaces().catch(() => null);
+  if (!workspaces) {
+    return (
+      <section className="page">
+        <PageHeader eyebrow="Overview" title={`${greetingFor()}, ${user.name.split(/\s+/)[0]}`} />
+        <EmptyState
+          icon={<IconAlert className="ic lg" />}
+          title="Your workspaces couldn’t be loaded"
+          body="The service didn’t answer. Nothing has been changed — reload to try again."
+          action={<Button href="/" variant="primary">Reload</Button>}
+        />
+      </section>
+    );
+  }
+
   const sessionCount = workspaces.reduce((total, workspace) => total + workspace.session_count, 0);
-  const details = await Promise.all(workspaces.map((workspace) => getWorkspace(workspace.id)));
+  // One unreadable workspace must not take down the whole overview.
+  const settled = await Promise.all(workspaces.map((workspace) => getWorkspace(workspace.id).catch(() => null)));
+  const details = settled.filter((workspace): workspace is NonNullable<typeof workspace> => workspace !== null);
+  const unreadable = settled.length - details.length;
   const allSessions: RecentSession[] = details.flatMap((workspace) => workspace.sessions.map((session) => ({
     id: session.id,
     workspaceId: workspace.id,
@@ -37,9 +59,14 @@ export default async function HomePage() {
         eyebrow="Overview"
         title={`${greetingFor()}, ${user.name.split(/\s+/)[0]}`}
         meta={
-          activeCount > 0
-            ? `${activeCount} session${activeCount === 1 ? '' : 's'} in progress · every result below traces to a cited source.`
-            : 'Every result below traces to a cited source.'
+          [
+            activeCount > 0 ? `${activeCount} session${activeCount === 1 ? '' : 's'} in progress` : null,
+            'every result below traces to a cited source',
+            // Never let a partial read pass for a complete picture.
+            unreadable > 0 ? `${unreadable} workspace${unreadable === 1 ? '' : 's'} could not be read and are excluded` : null,
+          ]
+            .filter(Boolean)
+            .join(' · ')
         }
         actions={<Button href="/workspace/new" variant="primary" icon={<IconPlus className="ic sm" />}>New workspace</Button>}
       />

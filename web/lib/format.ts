@@ -38,6 +38,12 @@ export function formatTime(value: string | number | Date, fallback = '—'): str
   return date.toLocaleTimeString(LOCALE, { timeZone: TZ, hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
+/** The hour (0–23) in Singapore, so a greeting matches the reader's day rather
+ * than whatever timezone the server happens to run in. */
+export function hourInSingapore(now: Date = new Date()): number {
+  return Number(now.toLocaleString('en-GB', { timeZone: TZ, hour: '2-digit', hour12: false }));
+}
+
 /**
  * Display label for a machine identifier: `legal_entity_name` → `Legal entity name`.
  *

@@ -403,17 +403,35 @@ export function logout(): Promise<unknown> {
   return apiFetch('/auth/logout', { method: 'POST' });
 }
 
-/** The signed-in user, or `null` when the session cookie is absent, stale, or the
- * API is unreachable (a network failure throws a plain `TypeError: fetch failed`,
- * not an `ApiError`). All three mean "no verified identity" — render the
- * signed-out shell rather than 500 every route when the backend is down. */
+/**
+ * The signed-in user, or `null` when there is no verified identity.
+ *
+ * This NEVER throws, and that is deliberate: every reason it could fail —
+ * cookie absent, cookie stale, endpoint missing, wrong service answering on the
+ * API port, backend down (a network failure surfaces as a plain
+ * `TypeError: fetch failed`, not an `ApiError`) — means exactly one thing to a
+ * page: we cannot say who you are. So render the signed-out shell.
+ *
+ * It used to rethrow any `ApiError` other than `NOT_AUTHENTICATED`, which
+ * contradicted the `User | null` signature and made all eight callers a 500
+ * waiting to happen. A `404` from `/auth/me` — what you get when something other
+ * than PaperMind is listening on `PAPERMIND_API_URL` — took down `/`, `/login`
+ * and the error page alike, leaving a visitor no way back in.
+ *
+ * The failure is logged rather than swallowed silently, so a misconfigured
+ * `PAPERMIND_API_URL` is still diagnosable from the server output.
+ */
 export async function getMe(): Promise<User | null> {
   try {
     return await apiFetch<User>('/auth/me');
   } catch (error) {
-    if (error instanceof ApiError && error.code === 'NOT_AUTHENTICATED') return null;
-    if (!(error instanceof ApiError)) return null;
-    throw error;
+    if (error instanceof ApiError && error.code !== 'NOT_AUTHENTICATED') {
+      console.warn(
+        `[papermind] GET /auth/me failed (${error.code}, HTTP ${error.status}) against ${BASE_URL} — ` +
+          'treating the visitor as signed out. Check PAPERMIND_API_URL points at the PaperMind API.',
+      );
+    }
+    return null;
   }
 }
 

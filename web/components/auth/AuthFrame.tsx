@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import { IconCheck, IconDoc, IconRefresh, IconSparkle } from '@/lib/icons';
+import { IconCheck, IconRefresh, IconSparkle } from '@/lib/icons';
+import { BrandMark } from '@/components/BrandMark';
 
 /**
  * The reference auth shell: a dark brand panel (`.login-brand`) with an indigo
@@ -11,7 +12,7 @@ export function AuthFrame({ pitch, children }: { pitch: string; children: ReactN
     <main className="login">
       <aside className="login-brand">
         <div className="brand">
-          <span className="brand-mark"><IconDoc className="ic sm" /></span>
+          <span className="brand-mark"><BrandMark /></span>
           <span className="brand-name">PaperMind</span>
         </div>
         <div className="lb-hero">

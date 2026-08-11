@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
-import { IconHome, IconDoc, IconLibrary, IconPlus } from '@/lib/icons';
+import { IconHome, IconLibrary, IconPlus } from '@/lib/icons';
+import { BrandMark } from './BrandMark';
 import type { User, WorkspaceOut } from '@/lib/api';
 import { AuthProvider } from './auth/AuthProvider';
 import { AccountMenu } from './HomeAccountMenu';
@@ -53,7 +54,7 @@ export function AppShell({
             so if the script is ever stripped the rail simply renders expanded. */}
         <aside id="app-sidebar" className={`sidebar${open ? ' open' : ''}`} aria-label="Primary navigation">
           <Link href="/" className="brand" aria-label="PaperMind home" title="PaperMind">
-            <span className="brand-mark"><IconDoc className="ic sm" /></span>
+            <span className="brand-mark"><BrandMark /></span>
             <span className="brand-name">PaperMind</span>
           </Link>
           <nav className="nav">

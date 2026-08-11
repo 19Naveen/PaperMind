@@ -40,7 +40,9 @@ export default async function PackDetailPage({
     if (error instanceof ApiError && error.code === 'PACK_NOT_FOUND') notFound();
     throw error;
   });
-  const workspaces = await listWorkspaces(200);
+  // Only feeds the install picker — an unreadable list must not take the Pack
+  // detail down with it. (The governance panels already use `safeFetch` below.)
+  const workspaces = await listWorkspaces(200).catch(() => []);
   const latest = detail.versions[detail.versions.length - 1] ?? null;
   const spec = latest?.spec ?? null;
 
