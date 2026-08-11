@@ -162,6 +162,10 @@ export function IconButton({
   variant = 'default',
   disabled,
   className = '',
+  expanded,
+  controls,
+  hasPopup,
+  pressed,
 }: {
   icon: ReactNode;
   label: string;
@@ -170,6 +174,15 @@ export function IconButton({
   variant?: 'default' | 'accent';
   disabled?: boolean;
   className?: string;
+  /** Disclosure state, for a trigger that opens a panel or collapses a region. */
+  expanded?: boolean;
+  /** id of the region this button controls, paired with `expanded`. */
+  controls?: string;
+  /** What kind of thing the trigger opens. `'menu'` for an overflow menu — a bare
+   * `true` only promises "some popup", which tells a screen reader less. */
+  hasPopup?: boolean | 'menu' | 'dialog' | 'listbox';
+  /** Toggle state, for a button that stays on or off. Use instead of `expanded`. */
+  pressed?: boolean;
 }) {
   return (
     <button
@@ -178,6 +191,10 @@ export function IconButton({
       disabled={disabled}
       aria-label={label}
       title={label}
+      aria-expanded={expanded}
+      aria-controls={controls}
+      aria-haspopup={hasPopup}
+      aria-pressed={pressed}
       className={`iconbtn${variant === 'accent' ? ' acc' : ''} ${className}`.trim()}
     >
       {icon}
@@ -414,8 +431,25 @@ export function Stat({ label, value, tone = 'default', sub, bare = false }: { la
 // be read as machine-recorded fact rather than prose.
 // ---------------------------------------------------------------------------
 
-export function Stamp({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <span className={`stamp ${className}`.trim()}>{children}</span>;
+type StampTone = 'default' | 'warn' | 'danger' | 'ok' | 'accent';
+const STAMP_TONE: Record<StampTone, string> = {
+  default: '',
+  warn: 'warn',
+  danger: 'dgr',
+  ok: 'ok',
+  accent: 'acc',
+};
+
+export function Stamp({
+  children,
+  tone = 'default',
+  className = '',
+}: {
+  children: ReactNode;
+  tone?: StampTone;
+  className?: string;
+}) {
+  return <span className={`stamp ${STAMP_TONE[tone]} ${className}`.trim()}>{children}</span>;
 }
 
 // ---------------------------------------------------------------------------

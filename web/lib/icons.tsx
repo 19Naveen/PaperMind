@@ -124,6 +124,28 @@ export const IconRows = svg(
     <path d="M4 5h16M4 12h16M4 19h16" />
   </>,
 );
+/** A panel with its side rail — the nav-rail collapse toggle. Reads as the thing
+ * it acts on, so it needs no rotation to mean "collapse" or "expand". */
+export const IconSidebar = svg(
+  <>
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <path d="M9 4v16" />
+  </>,
+);
+/** Rename. */
+export const IconPencil = svg(
+  <>
+    <path d="M12 20h9" />
+    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+  </>,
+);
+/** Delete. Paired with a confirmation everywhere it appears. */
+export const IconTrash = svg(
+  <>
+    <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" />
+    <path d="M10 11v5M14 11v5" />
+  </>,
+);
 export const IconBarChart = svg(
   <>
     <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />

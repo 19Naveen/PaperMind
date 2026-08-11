@@ -1,8 +1,8 @@
 import { notFound } from 'next/navigation';
 import { PackBuilderView } from '@/components/PackBuilderView';
 import { ApiError, getPack, getWorkspace } from '@/lib/api';
-import { Button, Card, CardHeader, PageHeader, Tag } from '@/components/ui';
-import { formatDate } from '@/lib/format';
+import { Button, Card, CardHeader, PageHeader, Stamp, Tag } from '@/components/ui';
+import { formatDate, humanise } from '@/lib/format';
 
 function RowList({ children }: { children: React.ReactNode }) {
   return <ul className="rows">{children}</ul>;
@@ -44,7 +44,9 @@ export default async function PackBuilderPage({
         actions={
           <>
             <Button href={`/workspace/${workspace.id}`} variant="ghost">← Workspace</Button>
-            <Button href={`/marketplace/${workspace.pack_id}/edit`} variant="primary">Edit pack</Button>
+            {/* The workspace-scoped Studio route, so the breadcrumb and back link
+                stay in the workspace the author came from. */}
+            <Button href={`/workspace/${workspace.id}/pack/edit`} variant="primary">Edit pack</Button>
           </>
         }
       />
@@ -57,7 +59,14 @@ export default async function PackBuilderPage({
                 <CardHeader title="Documents reviewed" />
                 <div className="card-pad">
                   <RowList>
-                    {spec.document_types.map((doc) => <li key={doc}>{doc}</li>)}
+                    {/* Humanised for reading, with the identifier kept beside it —
+                        the identifier is what the spec and the runtime refer to. */}
+                    {spec.document_types.map((doc) => (
+                      <li key={doc} className="row-2">
+                        <span>{humanise(doc)}</span>
+                        <span className="mono muted">{doc}</span>
+                      </li>
+                    ))}
                     {spec.document_types.length === 0 && <li className="muted">No document types defined.</li>}
                   </RowList>
                 </div>
@@ -69,7 +78,8 @@ export default async function PackBuilderPage({
                     {spec.fields.map((field) => (
                       <li key={field.name} className="row-2">
                         <span>
-                          <span className="mono">{field.name}</span>
+                          <b>{humanise(field.name)}</b>{' '}
+                          <span className="mono muted">{field.name}</span>
                           <span className="row-sub">{field.description}</span>
                         </span>
                         <Tag>{field.type}</Tag>
@@ -83,7 +93,12 @@ export default async function PackBuilderPage({
                 <CardHeader title="Rules" count={spec.rules.length} />
                 <div className="card-pad">
                   <RowList>
-                    {spec.rules.map((rule) => <li key={rule.id}>{rule.description}</li>)}
+                    {spec.rules.map((rule) => (
+                      <li key={rule.id} className="row-2">
+                        <span>{rule.description}</span>
+                        <Stamp>{rule.id}</Stamp>
+                      </li>
+                    ))}
                     {spec.rules.length === 0 && <li className="muted">No rules defined.</li>}
                   </RowList>
                 </div>

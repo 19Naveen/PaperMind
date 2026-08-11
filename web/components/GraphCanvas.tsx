@@ -19,9 +19,12 @@ import {
   type NodeChange,
   type EdgeChange,
 } from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
+// base.css, NOT style.css — see the note in PackBuilderView.tsx. style.css's default
+// theme arrives unlayered and beats every `.pm-graph` rule in the components layer,
+// which is what pinned this canvas to light colours in dark mode.
+import '@xyflow/react/dist/base.css';
 import type { FlowEdge, FlowNode, NodeKind } from '@/lib/types';
-import { IconSparkle } from '@/lib/icons';
+import { IconLayers } from '@/lib/icons';
 import { ActionButton, EmptyState } from '@/components/ui';
 import { DocTypeNode, FieldNode, RuleNode, type GraphNodeData } from './graph/nodes';
 
@@ -39,14 +42,18 @@ const PLACEHOLDER: Record<NodeKind, string> = {
 
 // Nodes are numbered 01..N in document_type → field → rule order, so the cards
 // can carry the prototype's numbered kicker and the ports/ledger views triangulate.
-function toRFNodes(nodes: FlowNode[], onRename: (id: string, label: string) => void): GNode[] {
+function toRFNodes(
+  nodes: FlowNode[],
+  onRename: (id: string, label: string) => void,
+  readOnly: boolean,
+): GNode[] {
   return [...nodes]
     .sort((a, b) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind])
     .map((n, i) => ({
       id: n.id,
       type: n.kind,
       position: n.position,
-      data: { label: n.label, detail: n.detail, num: String(i + 1).padStart(2, '0'), onRename },
+      data: { label: n.label, detail: n.detail, num: String(i + 1).padStart(2, '0'), onRename, readOnly },
     }));
 }
 
@@ -93,7 +100,7 @@ function Canvas({
   // handler — never during this render. Storing the function itself (not
   // reading `.current`) into node.data is the part happening now.
   // eslint-disable-next-line react-hooks/refs
-  const [rfNodes, setRfNodes] = useNodesState<GNode>(toRFNodes(nodes, onRename));
+  const [rfNodes, setRfNodes] = useNodesState<GNode>(toRFNodes(nodes, onRename, readOnly));
   const [rfEdges, setRfEdges] = useEdgesState<Edge>(toRFEdges(edges));
 
   const rfNodesRef = useRef(rfNodes);
@@ -183,14 +190,20 @@ function Canvas({
           id,
           type: kind,
           position: { x: COL_X[kind], y: 40 + count * 100 },
-          data: { label: PLACEHOLDER[kind], detail: kind === 'field' ? 'string' : undefined, num: '00', onRename },
+          data: {
+            label: PLACEHOLDER[kind],
+            detail: kind === 'field' ? 'string' : undefined,
+            num: '00',
+            onRename,
+            readOnly,
+          },
         };
-        const next = toRFNodes(fromRFNodes([...nds, newNode]), onRename);
+        const next = toRFNodes(fromRFNodes([...nds, newNode]), onRename, readOnly);
         emit(next, rfEdgesRef.current);
         return next;
       });
     },
-    [emit, onRename, setRfNodes],
+    [emit, onRename, readOnly, setRfNodes],
   );
 
   // External change (chat patch) landed while we're mounted — resync. Our
@@ -198,10 +211,10 @@ function Canvas({
   // `emit`, so this skips echoes and only fires on real outside edits.
   useEffect(() => {
     if (nodes !== lastEmitted.current.nodes) {
-      setRfNodes(toRFNodes(nodes, onRename));
+      setRfNodes(toRFNodes(nodes, onRename, readOnly));
       lastEmitted.current.nodes = nodes;
     }
-  }, [nodes, onRename, setRfNodes]);
+  }, [nodes, onRename, readOnly, setRfNodes]);
   useEffect(() => {
     if (edges !== lastEmitted.current.edges) {
       setRfEdges(toRFEdges(edges));
@@ -224,18 +237,14 @@ function Canvas({
         nodesConnectable={!readOnly}
         nodesDraggable={!readOnly}
         elementsSelectable
-        defaultEdgeOptions={{ style: { stroke: 'var(--color-ink-2)', strokeWidth: 1.5 } }}
         fitView
+        fitViewOptions={{ padding: 0.18 }}
+        minZoom={0.25}
       >
-        <Background
-          variant={BackgroundVariant.Dots}
-          color="color-mix(in srgb, var(--color-ink-3) 22%, transparent)"
-          gap={28}
-          size={1}
-        />
-        <Controls showInteractive={!readOnly} />
+        <Background variant={BackgroundVariant.Dots} gap={26} size={1} />
+        <Controls showInteractive={!readOnly} position="bottom-right" />
         {!readOnly && <Panel position="top-left">
-          <div className="flex gap-1.5 border border-rule bg-surface p-1.5 shadow-sm">
+          <div className="stu-gtools">
             <ActionButton variant="outline" size="sm" onClick={() => addNode('document_type')}>
               + Document type
             </ActionButton>
@@ -251,13 +260,13 @@ function Canvas({
           <Panel position="top-center">
             <div className="mx-auto mt-16 max-w-sm">
               <EmptyState
-                title="Nothing to show yet"
+                title="No workflow yet"
                 body={
                   readOnly
-                    ? 'Describe the Pack in the conversation — nodes appear here as the studio drafts them.'
-                    : 'Describe the Pack in the chat, or add a node here directly.'
+                    ? 'Describe the review in the conversation — the studio drafts a typed workflow and draws it here.'
+                    : 'Describe the review in the conversation, or add a node here directly.'
                 }
-                icon={<IconSparkle width={18} height={18} />}
+                icon={<IconLayers className="ic lg" />}
               />
             </div>
           </Panel>

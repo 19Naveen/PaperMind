@@ -37,3 +37,17 @@ export function formatTime(value: string | number | Date, fallback = '—'): str
   if (!date) return fallback;
   return date.toLocaleTimeString(LOCALE, { timeZone: TZ, hour: '2-digit', minute: '2-digit', hour12: false });
 }
+
+/**
+ * Display label for a machine identifier: `legal_entity_name` → `Legal entity name`.
+ *
+ * Never a replacement — every surface that shows a humanised label should keep the
+ * identifier visible too, because the identifier is what the Pack spec, the runtime
+ * and any audit trail actually refer to. Raw `snake_case` on its own is the single
+ * loudest tell that a screen was generated from a schema rather than designed.
+ */
+export function humanise(raw: string): string {
+  const text = raw.trim().replace(/[_\-.]+/g, ' ').replace(/\s+/g, ' ');
+  if (!text) return raw;
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}

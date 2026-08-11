@@ -3,8 +3,12 @@
 import { useState } from 'react';
 
 /**
- * Double-click a node's label to rename it inline. Shared by all three node
- * kinds — the only thing renaming needs is a controlled span/input swap.
+ * Rename a node's label in place. Shared by all three legacy node kinds.
+ *
+ * Reachable by keyboard as well as by mouse: the resting state is a real button, so
+ * Tab reaches it and Enter/Space opens the editor. The old build was a `<span>` with
+ * an `onDoubleClick` and a "Double-click to rename" tooltip, which meant renaming was
+ * impossible without a pointer.
  */
 export function EditableLabel({
   value,
@@ -25,11 +29,17 @@ export function EditableLabel({
     else setDraft(value);
   }
 
+  function start() {
+    setDraft(value);
+    setEditing(true);
+  }
+
   if (editing) {
     return (
       <input
         autoFocus
-        className={`nodrag w-full rounded-none border border-accent bg-surface px-1 py-0.5 text-inherit outline-none ${className ?? ''}`}
+        aria-label="Node label"
+        className={`nodrag wf-rename ${className ?? ''}`.trim()}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
@@ -45,16 +55,27 @@ export function EditableLabel({
   }
 
   return (
-    <span
-      className={className}
+    <button
+      type="button"
+      className={`wf-renamebtn ${className ?? ''}`.trim()}
+      title="Rename"
+      aria-label={`Rename ${value}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        start();
+      }}
       onDoubleClick={(e) => {
         e.stopPropagation();
-        setDraft(value);
-        setEditing(true);
+        start();
       }}
-      title="Double-click to rename"
+      onKeyDown={(e) => {
+        if (e.key === 'F2') {
+          e.preventDefault();
+          start();
+        }
+      }}
     >
       {value}
-    </span>
+    </button>
   );
 }

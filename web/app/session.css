@@ -1,0 +1,643 @@
+/* app/session.css — owned by the session surface. Imported into the `components` cascade layer
+   by app/globals.css. Tokens live in globals.css §1; never hardcode a colour
+   here, and never redefine a token.
+
+   ---------------------------------------------------------------------------
+   CASCADE NOTE, load-bearing: globals.css imports this file at the TOP of the
+   sheet and then appends its own `@layer components { … }` block. Both end up
+   in the same layer, so for equal specificity GLOBALS WINS — a bare `.chk` or
+   `.ev` rule written here would silently lose to globals.css §13.
+
+   Two consequences, both deliberate:
+     1. This surface uses its own `rev-*` namespace (review), so it collides
+        with nothing. The old `.sess-*` / `.chk` / `.summary` / `.stages` rules
+        in globals.css §13 are now unused by this screen and are left alone.
+     2. Where the canonical evidence block IS reused, every override doubles the
+        class (`.ev.rev-ev`) to outrank `.ev`, `.ev mark` and `.ev cite`. Do not
+        "simplify" those selectors — they stop applying.
+   --------------------------------------------------------------------------- */
+
+/* ==========================================================================
+   1 · FRAME
+   The page scrolls in the shell's `.content`, so there is no inner scroll pane
+   to trap a narrow viewport. The header sticks to the top of that scroll.
+   ========================================================================== */
+
+.rev {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  background: var(--bg);
+}
+
+.rev-head {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--s4) var(--s6);
+  align-items: start;
+  padding: var(--s6) var(--s8) var(--s5);
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.rev-head-id { min-width: 0 }
+.rev-title {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  flex-wrap: wrap;
+}
+.rev-prov {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  flex-wrap: wrap;
+  margin-top: var(--s4);
+}
+.rev-rename {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  flex-wrap: wrap;
+  margin-top: var(--s3);
+}
+.rev-rename .input { width: min(64vw, 380px) }
+.rev-head-act {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  flex-wrap: wrap;
+}
+.rev-head-hint {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  flex-wrap: wrap;
+  margin: 0;
+  font-size: var(--t-sm);
+  color: var(--ink-3);
+}
+.rev-head-hint.is-err { color: var(--danger) }
+
+/* overflow menu — one control for the session's lifecycle actions, matching the
+   consolidation the workspace screen uses. `.acc-item` / `.acc-sep` are the shared
+   menu-row classes from globals.css §6. */
+.rev-menu { position: relative }
+.rev-menu > .iconbtn[aria-expanded="true"] { background: var(--inset); border-color: var(--line); color: var(--ink) }
+.rev-menu-pop {
+  position: absolute;
+  right: 0;
+  top: 40px;
+  z-index: 40;
+  width: 212px;
+  padding: var(--s2);
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-card);
+  box-shadow: var(--sh-3);
+  animation: drop .14s ease;
+}
+
+.rev-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 336px;
+  gap: var(--s6);
+  align-items: start;
+  padding: var(--s6) var(--s8) 80px;
+}
+.rev-main,
+.rev-side {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s5);
+}
+
+/* ==========================================================================
+   2 · TRIAGE
+   No stat tiles. One sentence that answers "what needs me?", one distribution
+   bar, and the filter that acts on the answer.
+   ========================================================================== */
+
+.rev-triage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+  padding: var(--s5) var(--s6);
+  border-bottom: 1px solid var(--line);
+}
+.rev-triage-line {
+  font-size: var(--t-md);
+  line-height: var(--lh-snug);
+  color: var(--ink-2);
+  max-width: 82ch;
+}
+.rev-triage-line b { color: var(--ink); font-weight: var(--w-sb) }
+.rev-triage-line b.is-ok { color: var(--ok) }
+
+.rev-meter {
+  display: flex;
+  gap: 2px;
+  height: 6px;
+  border-radius: 99px;
+  background: var(--inset);
+  overflow: hidden;
+}
+.rev-meter i { display: block; min-width: 5px; border-radius: 99px }
+.rev-meter i.is-verified { background: var(--ok) }
+.rev-meter i.is-unsupported { background: var(--warn) }
+.rev-meter i.is-missing { background: var(--danger) }
+
+.rev-tabs {
+  display: inline-flex;
+  align-self: flex-start;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 3px;
+  background: var(--inset);
+  border: 1px solid var(--line);
+  border-radius: var(--r-ctl);
+}
+.rev-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  height: 29px;
+  padding: 0 var(--s4);
+  border-radius: var(--r-s);
+  font-size: var(--t-sm);
+  font-weight: var(--w-sb);
+  color: var(--ink-3);
+  transition: background-color .12s, color .12s, box-shadow .12s;
+}
+.rev-tab:hover { color: var(--ink-2); background: var(--wash-1) }
+.rev-tab[aria-selected="true"] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--sh-1), 0 0 0 1px var(--line);
+}
+.rev-tab-n {
+  min-width: 18px;
+  padding: 0 var(--s1);
+  border-radius: 99px;
+  background: var(--wash-1);
+  font-family: var(--f-mono);
+  font-size: var(--t-2xs);
+  text-align: center;
+}
+.rev-tab[aria-selected="true"] .rev-tab-n { background: var(--accent-soft); color: var(--accent) }
+
+/* ==========================================================================
+   3 · CHECKS
+   ========================================================================== */
+
+.rev-case-hd {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s4);
+  flex-wrap: wrap;
+  padding: var(--s6) var(--s6) var(--s2);
+}
+.rev-case-hd h3 { font-size: var(--t-md); font-weight: var(--w-sb) }
+.rev-case-meta {
+  font-family: var(--f-mono);
+  font-size: var(--t-2xs);
+  letter-spacing: var(--tr-wide);
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.rev-grp {
+  padding: var(--s4) var(--s6) 0;
+  font-size: var(--t-2xs);
+  font-weight: var(--w-bd);
+  letter-spacing: var(--tr-wider);
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.rev-chk {
+  display: grid;
+  grid-template-columns: 128px minmax(0, 1fr) auto;
+  gap: var(--s3) var(--s5);
+  padding: var(--s5) var(--s6) var(--s6);
+  border-top: 1px solid var(--line);
+  border-left: 3px solid transparent;
+  transition: background-color .12s;
+}
+.rev-grp + .rev-chk { border-top-color: transparent }
+.rev-chk:hover { background: var(--surface-2) }
+.rev-chk.is-verified { border-left-color: var(--ok) }
+.rev-chk.is-unsupported { border-left-color: var(--warn) }
+.rev-chk.is-missing { border-left-color: var(--danger) }
+
+.rev-state {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: start;
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  height: 24px;
+  padding: 0 var(--s3);
+  border: 1px solid transparent;
+  border-radius: var(--r-s);
+  font-size: var(--t-xs);
+  font-weight: var(--w-sb);
+  white-space: nowrap;
+}
+.rev-chk.is-verified .rev-state { background: var(--ok-soft); color: var(--ok); border-color: var(--ok-line) }
+.rev-chk.is-unsupported .rev-state { background: var(--warn-soft); color: var(--warn); border-color: var(--warn-line) }
+.rev-chk.is-missing .rev-state { background: var(--danger-soft); color: var(--danger); border-color: var(--danger-line) }
+
+.rev-chk-id {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--s3);
+  flex-wrap: wrap;
+}
+.rev-chk-id h4 { font-size: var(--t-md); font-weight: var(--w-sb); letter-spacing: var(--tr-tight) }
+.rev-chk-act { grid-column: 3; grid-row: 1; justify-self: end }
+.rev-chk-main {
+  grid-column: 2 / -1;
+  grid-row: 2;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+}
+
+/* the machine identifier, kept beside the human label because the schema field
+   name is what an audit refers to */
+.rev-key {
+  padding: 1px var(--s2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-s);
+  background: var(--inset);
+  font-family: var(--f-mono);
+  font-size: var(--t-2xs);
+  letter-spacing: var(--tr-none);
+  color: var(--ink-3);
+}
+
+.rev-chk-desc {
+  font-size: var(--t-sm);
+  line-height: var(--lh-body);
+  color: var(--ink-3);
+  max-width: 78ch;
+}
+.rev-val {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s4);
+  flex-wrap: wrap;
+  margin: 0;
+}
+.rev-val dt {
+  font-size: var(--t-2xs);
+  font-weight: var(--w-bd);
+  letter-spacing: var(--tr-wider);
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.rev-val dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-family: var(--f-mono);
+  font-size: var(--t-md);
+  font-weight: var(--w-md);
+  color: var(--ink);
+}
+.rev-val dd.rev-val-none {
+  font-family: var(--f-body);
+  font-size: var(--t-sm);
+  font-style: italic;
+  color: var(--ink-3);
+}
+.rev-verdict { font-size: var(--t-base); font-weight: var(--w-md); color: var(--ink) }
+
+/* ==========================================================================
+   4 · SIGNATURE — the evidence block
+   The quoted sentence, the highlight, and the provenance line. Nothing else on
+   this page is allowed to be this loud.
+   ========================================================================== */
+
+.ev.rev-ev {
+  position: relative;
+  margin: 0;
+  padding: var(--s4) var(--s5) var(--s4) var(--s7);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 var(--r-card) var(--r-card) 0;
+  background: var(--accent-softer);
+  color: var(--ink);
+  font-size: var(--t-md);
+  line-height: var(--lh-loose);
+}
+.ev.rev-ev::before {
+  content: "\201C";
+  position: absolute;
+  left: var(--s3);
+  top: var(--s2);
+  font-family: var(--f-display);
+  font-size: var(--t-2xl);
+  line-height: 1;
+  color: var(--accent-line);
+}
+.rev-quote { margin: 0; overflow-wrap: anywhere }
+
+/* The highlighter stroke. A citation's `quote` IS the span the runtime matched
+   verbatim in the source (services/runtime.py `_locate_quote`), so marking the
+   whole quote states a fact rather than inventing emphasis — and the provenance
+   line says "located verbatim" in words, because a highlight alone is colour.
+   Rule evidence can be a chunk excerpt instead, and is never marked. */
+.ev.rev-ev .rev-mark {
+  padding: 0;
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--ink);
+  background: linear-gradient(to top, var(--hl) 0, var(--hl) 42%, transparent 42%);
+}
+
+.ev.rev-ev cite {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  flex-wrap: wrap;
+  margin-top: var(--s4);
+  padding-top: var(--s3);
+  border-top: 1px dashed var(--accent-line);
+  color: var(--ink-3);
+}
+.ev.rev-ev cite .rev-cite-doc { color: var(--ink-2); font-weight: var(--w-sb) }
+.ev.rev-ev cite > span + span::before { content: "·"; margin-right: var(--s2); color: var(--line-2) }
+
+/* the absence of evidence, stated */
+.rev-noev {
+  padding: var(--s4) var(--s5);
+  border: 1px dashed var(--line-2);
+  border-radius: var(--r-ctl);
+  background: var(--surface-2);
+}
+.rev-noev b { display: block; font-size: var(--t-base); font-weight: var(--w-sb); color: var(--ink-2) }
+.rev-noev p {
+  margin-top: 2px;
+  font-size: var(--t-sm);
+  line-height: var(--lh-body);
+  color: var(--ink-3);
+  max-width: 76ch;
+}
+.rev-noev.is-broken { border-color: var(--danger-line); background: var(--danger-soft) }
+.rev-noev.is-broken b { color: var(--danger) }
+
+/* ==========================================================================
+   5 · CORRECTING
+   ========================================================================== */
+
+.rev-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+  padding: var(--s5);
+  background: var(--surface-2);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-card);
+  animation: rise .18s ease;
+}
+.rev-form-note { font-size: var(--t-sm); line-height: var(--lh-body); color: var(--ink-3); max-width: 74ch }
+.rev-form-grid {
+  display: grid;
+  grid-template-columns: 136px minmax(0, 1fr);
+  gap: var(--s3) var(--s5);
+  align-items: center;
+}
+.rev-lbl { font-size: var(--t-sm); font-weight: var(--w-md); color: var(--ink-2) }
+.rev-form-act { display: flex; justify-content: flex-end; gap: var(--s3); flex-wrap: wrap }
+.rev-err { font-size: var(--t-sm); color: var(--danger) }
+
+.rev-chk-log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s2) }
+.rev-chk-log li {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  flex-wrap: wrap;
+  padding: var(--s2) var(--s4);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--r-s);
+  background: var(--accent-softer);
+  font-size: var(--t-sm);
+}
+.rev-log-mark {
+  font-size: var(--t-2xs);
+  font-weight: var(--w-bd);
+  letter-spacing: var(--tr-wide);
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.rev-log-val { font-family: var(--f-mono); color: var(--ink); overflow-wrap: anywhere }
+.rev-chk-log time { margin-left: auto; font-family: var(--f-mono); font-size: var(--t-2xs); color: var(--ink-3) }
+
+.rev-ledger-list { list-style: none; margin: 0; padding: 0 }
+.rev-ledger-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--s2) var(--s5);
+  align-items: center;
+  padding: var(--s4) var(--s6);
+  border-top: 1px solid var(--line);
+}
+.rev-ledger-change { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; font-size: var(--t-sm) }
+.rev-ledger-change s { color: var(--ink-3) }
+.rev-ledger-change b { font-family: var(--f-mono); font-weight: var(--w-sb); color: var(--ink); overflow-wrap: anywhere }
+.rev-ledger-change .ic { color: var(--ink-3) }
+.rev-ledger-row time { font-family: var(--f-mono); font-size: var(--t-2xs); color: var(--ink-3) }
+.rev-ledger-row p { grid-column: 2 / -1; font-size: var(--t-sm); color: var(--ink-2); line-height: var(--lh-body) }
+
+/* ==========================================================================
+   6 · STATES & CONTEXT
+   ========================================================================== */
+
+.rev-note {
+  margin: 0;
+  padding: var(--s5) var(--s6);
+  font-size: var(--t-sm);
+  line-height: var(--lh-loose);
+  color: var(--ink-2);
+  max-width: 80ch;
+}
+.rev-foot-note {
+  margin: 0;
+  padding: var(--s4) var(--s6) var(--s5);
+  border-top: 1px solid var(--line);
+  font-size: var(--t-sm);
+  line-height: var(--lh-body);
+  color: var(--ink-3);
+}
+.rev-fine { font-size: var(--t-sm); line-height: var(--lh-body); color: var(--ink-3) }
+
+.rev-live,
+.rev-failed { display: flex; align-items: flex-start; gap: var(--s5); padding: var(--s6) }
+.rev-live-ic {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-ctl);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.rev-live-ic.is-err { background: var(--danger-soft); color: var(--danger) }
+.rev-live h3,
+.rev-failed h3 { font-size: var(--t-lg); font-weight: var(--w-sb) }
+.rev-live p,
+.rev-failed p {
+  margin-top: var(--s2);
+  font-size: var(--t-base);
+  line-height: var(--lh-loose);
+  color: var(--ink-2);
+  max-width: 72ch;
+}
+.rev-live-meta { display: flex; gap: var(--s2); flex-wrap: wrap; margin-top: var(--s4) }
+
+.rev-docs { list-style: none; margin: 0; padding: var(--s2) var(--s4) }
+.rev-docs li {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s3);
+  border-radius: var(--r-s);
+  font-size: var(--t-sm);
+}
+.rev-docs li:hover { background: var(--surface-2) }
+.rev-docs .ic { color: var(--ink-3) }
+.rev-doc-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--f-mono);
+  font-size: var(--t-xs);
+  color: var(--ink-2);
+}
+.rev-side-act { display: flex; flex-direction: column; gap: var(--s3); padding: 0 var(--s5) var(--s5) }
+.rev-kv-body { padding: var(--s3) var(--s5) var(--s4) }
+
+/* disclosures — the chat utility and the roadmap note, closed by default so
+   neither competes with the review list */
+.rev-disc { padding: 0 }
+.rev-disc > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  min-height: 46px;
+  padding: var(--s4) var(--s5);
+  border-radius: var(--r-card);
+  font-size: var(--t-md);
+  font-weight: var(--w-sb);
+  cursor: pointer;
+}
+.rev-disc > summary:hover { background: var(--surface-2) }
+.rev-disc[open] > summary { border-bottom: 1px solid var(--line); border-radius: var(--r-card) var(--r-card) 0 0 }
+.rev-disc > summary::after {
+  content: "";
+  margin-left: auto;
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid var(--ink-3);
+  border-bottom: 1.5px solid var(--ink-3);
+  transform: rotate(45deg);
+  transition: transform .15s;
+}
+.rev-disc[open] > summary::after { transform: rotate(-135deg) }
+.rev-disc-n {
+  margin-left: var(--s1);
+  font-family: var(--f-mono);
+  font-size: var(--t-2xs);
+  letter-spacing: var(--tr-wide);
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.rev-disc-body { display: flex; flex-direction: column; gap: var(--s4); padding: var(--s5) }
+
+.rev-chat { display: flex; flex-direction: column; gap: var(--s4); max-height: 280px; overflow-y: auto }
+.rev-bubble { white-space: pre-line }
+.rev-ask { display: flex; align-items: center; gap: var(--s2) }
+.rev-ask .input { flex: 1 }
+
+.rev-roadmap { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s3) }
+.rev-roadmap li {
+  position: relative;
+  padding-left: var(--s5);
+  font-size: var(--t-sm);
+  line-height: var(--lh-body);
+  color: var(--ink-3);
+}
+.rev-roadmap li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--line-2);
+}
+.rev-roadmap b { color: var(--ink-2); font-weight: var(--w-sb) }
+
+/* ==========================================================================
+   7 · RESPONSIVE
+   The work comes first in the DOM, so the single-column stack puts the review
+   list above its context at every width — no copy on this page refers to a
+   panel's position.
+   ========================================================================== */
+
+@media (max-width: 1180px) {
+  .rev-head { padding: var(--s6) var(--s7) var(--s5) }
+  .rev-body { grid-template-columns: minmax(0, 1fr) 300px; padding: var(--s6) var(--s7) 72px }
+}
+
+@media (max-width: 1024px) {
+  .rev-body { grid-template-columns: minmax(0, 1fr) }
+  .rev-chk { grid-template-columns: 120px minmax(0, 1fr) auto }
+}
+
+@media (max-width: 700px) {
+  .rev-head {
+    position: static;
+    grid-template-columns: minmax(0, 1fr);
+    padding: var(--s5);
+  }
+  .rev-title { font-size: var(--t-xl) }
+  .rev-body { gap: var(--s5); padding: var(--s5) var(--s5) 64px }
+  .rev-triage,
+  .rev-note,
+  .rev-foot-note { padding-left: var(--s5); padding-right: var(--s5) }
+  .rev-case-hd,
+  .rev-grp,
+  .rev-ledger-row { padding-left: var(--s5); padding-right: var(--s5) }
+  /* the filter scrolls rather than wrapping — a two-line tab is a mis-hit waiting to happen */
+  .rev-tabs { width: 100%; flex-wrap: nowrap; overflow-x: auto }
+  .rev-tab { flex: 1 0 auto; justify-content: center; white-space: nowrap; padding: 0 var(--s3) }
+  .rev-chk {
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: var(--s5) var(--s5) var(--s6);
+  }
+  .rev-chk-id { grid-column: 1 / -1; grid-row: 2 }
+  .rev-chk-act { grid-column: 2; grid-row: 1 }
+  .rev-chk-main { grid-column: 1 / -1; grid-row: 3 }
+  .ev.rev-ev { padding-left: var(--s6) }
+  .rev-form-grid { grid-template-columns: minmax(0, 1fr) }
+  .rev-ledger-row { grid-template-columns: minmax(0, 1fr) }
+  .rev-ledger-row p { grid-column: 1 }
+}

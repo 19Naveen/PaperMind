@@ -9,90 +9,64 @@ export type GraphNodeData = {
   label: string;
   detail?: string;
   onRename: (id: string, label: string) => void;
+  /** When the canvas is read-only the label is NOT editable. It used to render the
+   * editable affordance anyway: a rename mutated local canvas state, was emitted into
+   * an `onChange` the studio deliberately ignores, and was silently lost. */
+  readOnly?: boolean;
 };
 
 type GraphNode = Node<GraphNodeData>;
 
-const shell =
-  'min-w-40 max-w-56 bg-surface border border-rule px-3 py-2 text-base text-ink shadow-sm transition hover:border-accent hover:shadow-md';
+/** Card chrome lives in app/studio.css (`.wf-node`); the rail colour comes from the
+ * `data-kind` attribute so no colour is expressed in this file. */
+function shell(selected: boolean): string {
+  return `wf-node${selected ? ' is-sel' : ''}`;
+}
 
-const kicker = 'text-2xs tracking-widest uppercase text-accent';
+function Label({ id, data }: { id: string; data: GraphNodeData }) {
+  if (data.readOnly) return <span className="l">{data.label}</span>;
+  return <EditableLabel value={data.label} onChange={(v) => data.onRename(id, v)} className="l" />;
+}
 
-/** Document types: the sources feeding the pipeline. Page glyph, numbered kicker. */
+/** Document types: the sources feeding the pipeline. */
 export function DocTypeNode({ id, data, selected }: NodeProps<GraphNode>) {
   return (
-    <div className={`${shell} ${selected ? 'ring-2 ring-accent' : ''}`}>
+    <div className={shell(Boolean(selected))} data-kind="document_type">
       <Handle type="source" position={Position.Right} />
-      <div className="flex items-center gap-1.5">
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="shrink-0 text-ink-2">
-          <path
-            d="M2.5 1h4.5L9.5 3.5V11h-7V1z"
-            stroke="currentColor"
-            strokeWidth="1"
-            strokeLinejoin="round"
-          />
-          <path d="M7 1v2.5h2.5" stroke="currentColor" strokeWidth="1" strokeLinejoin="round" />
-        </svg>
-        <p className={kicker}>
-          {data.num} · Source
-        </p>
-      </div>
-      <EditableLabel
-        value={data.label}
-        onChange={(v) => data.onRename(id, v)}
-        className="mt-1 block text-base leading-tight"
-      />
+      <span className="k">{data.num} · Source</span>
+      <Label id={id} data={data} />
     </div>
   );
 }
 
-/** Fields: the extraction step. Funnel glyph, type shown as a data-font stamp. */
+/** Fields: the extraction step. The declared type rides along as a machine stamp. */
 export function FieldNode({ id, data, selected }: NodeProps<GraphNode>) {
   return (
-    <div className={`${shell} ${selected ? 'ring-2 ring-accent' : ''}`}>
+    <div className={shell(Boolean(selected))} data-kind="field">
       <Handle type="target" position={Position.Left} />
       <Handle type="source" position={Position.Right} />
-      <div className="flex items-center gap-1.5">
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="shrink-0 text-ink-2">
-          <path d="M1.5 2h9L7 6.5V10l-2 1V6.5L1.5 2z" stroke="currentColor" strokeWidth="1" strokeLinejoin="round" />
-        </svg>
-        <p className={kicker}>
-          {data.num} · Field
-        </p>
-      </div>
-      <EditableLabel
-        value={data.label}
-        onChange={(v) => data.onRename(id, v)}
-        className="mt-1 block text-base leading-tight"
-      />
-      {data.detail && <p className="stamp mt-1.5 inline-block">{data.detail}</p>}
+      <span className="k">{data.num} · Field</span>
+      <Label id={id} data={data} />
+      {data.detail && (
+        <span className="d" title={data.detail}>
+          <span className="mono">{data.detail}</span>
+        </span>
+      )}
     </div>
   );
 }
 
-/** Rules: validations feeding off fields. Detail line carries the rule text. */
+/** Rules: validations feeding off fields. The detail line carries the rule text. */
 export function RuleNode({ id, data, selected }: NodeProps<GraphNode>) {
   return (
-    <div className={`${shell} ${selected ? 'ring-2 ring-accent' : ''}`}>
+    <div className={shell(Boolean(selected))} data-kind="rule">
       <Handle type="target" position={Position.Left} />
-      <div className="flex items-center gap-1.5">
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="shrink-0 text-ink-2">
-          <path d="M6 1l4.5 2.2v3.6L6 11 1.5 6.8V3.2L6 1z" stroke="currentColor" strokeWidth="1" strokeLinejoin="round" />
-          <path d="M4 6l1.4 1.4L8.2 4.6" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        <p className={kicker}>
-          {data.num} · Rule
-        </p>
-      </div>
-      <EditableLabel
-        value={data.label}
-        onChange={(v) => data.onRename(id, v)}
-        className="mt-1 block text-base leading-tight"
-      />
+      <span className="k">{data.num} · Rule</span>
+      <Label id={id} data={data} />
       {data.detail && (
-        <p className="mt-1 truncate text-sm text-ink-2" title={data.detail}>
+        <span className="d" title={data.detail}>
           {data.detail}
-        </p>
+        </span>
       )}
     </div>
   );

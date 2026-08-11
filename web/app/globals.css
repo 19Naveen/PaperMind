@@ -1,5 +1,27 @@
 @import "tailwindcss";
 
+/* Per-surface stylesheets. `layer(components)` puts them in the same layer as
+   the component rules below, so Tailwind utilities still win over them. Each
+   file is owned by one surface, which keeps parallel work from colliding in a
+   single 1500-line stylesheet.
+
+   ORDERING HAZARD, read before adding rules to a surface file: `@import` is only
+   legal at the top of a stylesheet, so these land BEFORE the `@layer components`
+   block below. Same layer + earlier source order means a specificity TIE goes to
+   globals.css, not to the surface file. So a surface file cannot simply restate
+   `.chk` or `.ev` and expect to win.
+
+   The surfaces handle this by namespacing their own rules (`.rev-*`, `.wk-*`,
+   `.stu-*`) and doubling up (`.ev.rev-ev`) where they must override a shared
+   class — which is better practice anyway. It is NOT fixed by declaring a later
+   layer here: Tailwind v4 emits no explicit `@layer` order statement, so its
+   layers are ordered by first appearance, and naming them by hand risks putting
+   a new layer after `utilities` and quietly breaking every utility class. */
+@import "./shell.css" layer(components);
+@import "./studio.css" layer(components);
+@import "./session.css" layer(components);
+@import "./workspace.css" layer(components);
+
 /* ==========================================================================
    PaperMind — design system
    --------------------------------------------------------------------------
@@ -378,7 +400,6 @@
   }
   .btn:hover { transform: translateY(-1px) }
   .btn:active { transform: translateY(0) }
-  .btn:disabled, .btn.disabled { opacity: .5; cursor: not-allowed; transform: none }
   .btn:disabled:hover, .btn.disabled:hover { transform: none }
   .btn.disabled { pointer-events: none }
 
@@ -404,6 +425,16 @@
 
   .btn.danger { background: var(--surface); color: var(--danger); border-color: var(--danger-line) }
   .btn.danger:hover { background: var(--danger-soft); border-color: var(--danger) }
+
+  /* Disabled has to be its own appearance, not a dimmed copy of the variant.
+     In dark mode `--accent` is a LIGHT indigo, so the old `opacity:.5` left a
+     disabled primary button and an enabled one at nearly the same luminance —
+     on the account page "Update password" (disabled) and "Save changes"
+     (enabled) were indistinguishable. Placed after the variants so it wins. */
+  .btn:disabled, .btn.disabled {
+    cursor: not-allowed; transform: none; box-shadow: none;
+    background: var(--inset); color: var(--ink-3); border-color: var(--line);
+  }
 
   .btn.sm { height: 30px; padding: 0 var(--s3); font-size: var(--t-sm); gap: var(--s1) }
   .btn.lg { height: 42px; padding: 0 var(--s5) }
@@ -484,6 +515,12 @@
     font-family: var(--f-mono); font-size: var(--t-2xs);
     letter-spacing: var(--tr-wide); text-transform: uppercase; font-variant-numeric: tabular-nums;
   }
+  /* A stamp records a fact, so its tone only ever qualifies that fact — e.g. a run
+     pinned to a version older than the one now in force. */
+  .stamp.warn { background: var(--warn-soft); border-color: var(--warn-line); color: var(--warn) }
+  .stamp.dgr { background: var(--danger-soft); border-color: var(--danger-line); color: var(--danger) }
+  .stamp.ok { background: var(--ok-soft); border-color: var(--ok-line); color: var(--ok) }
+  .stamp.acc { background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent) }
 
   /* --- segmented control & chips --- */
   .seg {
@@ -597,11 +634,16 @@
     display: flex; flex-direction: column; align-items: center; text-align: center;
     gap: var(--s2); padding: var(--s9) var(--s7);
   }
+  /* A thin stroke icon centred in a filled grey square reads as a spinner —
+     the studio's empty states were being mistaken for perpetual loading. A
+     tinted, outlined plate with a larger glyph reads as an illustration. */
   .empty .e-ic {
-    width: 50px; height: 50px; margin-bottom: var(--s2);
-    border-radius: var(--r-card); background: var(--inset); color: var(--ink-3);
+    width: 48px; height: 48px; margin-bottom: var(--s3);
+    border-radius: var(--r-card);
+    background: var(--accent-softer); border: 1px solid var(--accent-line); color: var(--accent);
     display: grid; place-items: center;
   }
+  .empty .e-ic .ic, .empty .e-ic svg { width: 22px; height: 22px }
   .empty h3 { font-size: var(--t-lg); font-weight: var(--w-sb) }
   .empty p { color: var(--ink-2); font-size: var(--t-base); max-width: 46ch; line-height: var(--lh-loose) }
   .empty .btn, .empty .stack { margin-top: var(--s4) }
@@ -613,9 +655,16 @@
   }
   .stat { padding: var(--s5) var(--s6); border-left: 1px solid var(--line) }
   .stat:first-child { border-left: 0 }
+  /* Reserve two lines for the label so a wrapping one ("Sessions completed")
+     doesn't push its value below the values beside it — the numbers are meant
+     to be read across the row, so they must share a baseline. */
   .stat .s-l {
     font-size: var(--t-xs); font-weight: var(--w-bd);
     letter-spacing: var(--tr-wide); text-transform: uppercase; color: var(--ink-3);
+    /* line-height is pinned so the two-line reservation is exact — inheriting
+       the body's 1.55 made the reserved box shorter than a real wrapped label. */
+    line-height: 1.3;
+    min-height: calc(2 * var(--t-xs) * 1.3);
   }
   .stat .s-v {
     font-size: var(--t-2xl); font-weight: var(--w-sb); line-height: var(--lh-tight);
@@ -642,6 +691,24 @@
   }
   .avatar.top { cursor: pointer }
   .avatar.xl { width: 56px; height: 56px; border-radius: var(--r-lg); font-size: var(--t-lg) }
+
+  /* --- loading skeleton -----------------------------------------------------
+     Placeholders are filled with `--inset`, never `--surface`: in dark mode a
+     surface-filled card is within a couple of steps of the page ground, so the
+     skeleton read as three empty voids instead of content-on-its-way. The
+     shimmer travels rather than pulsing the whole block, which reads as
+     "loading" instead of "broken". ---- */
+  .skel { background: var(--inset); border-radius: var(--r-s); position: relative; overflow: hidden }
+  .skel::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, var(--wash-1), transparent);
+    animation: skel-sweep 1.4s ease-in-out infinite;
+  }
+  @keyframes skel-sweep { from { transform: translateX(-100%) } to { transform: translateX(100%) } }
+  .skel-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); padding: var(--s5) }
+  .skel-line { height: 10px }
+  .skel-title { height: 22px }
+  @media (prefers-reduced-motion: reduce) { .skel::after { animation: none } }
 
   /* --- callout --- */
   .callout {
@@ -912,7 +979,15 @@
      9 · HOME
      ========================================================================== */
 
-  .home-grid { display: grid; grid-template-columns: minmax(0, 1fr) 344px; gap: var(--s6); align-items: start }
+  /* Both columns must start on the same line. `.sec-head` carries its own top
+     margin, which dropped the workspace column by 24px while the rail stayed
+     flush against the stats strip above it — the rail read as if it were glued
+     to the analytics row. Hoist the offset onto the grid and zero the heading's. */
+  .home-grid {
+    display: grid; grid-template-columns: minmax(0, 1fr) 344px;
+    gap: var(--s6); align-items: start; margin-top: var(--s7);
+  }
+  .home-grid .sec-head:first-child { margin-top: 0 }
   .ws-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--s5) }
   .ws-card, .mk-card {
     padding: var(--s5); cursor: pointer; position: relative; transform: translateZ(0);

@@ -1,0 +1,179 @@
+/* app/workspace.css — owned by the workspace surface. Imported into the `components` cascade layer
+   by app/globals.css. Tokens live in globals.css §1; never hardcode a colour
+   here, and never redefine a token. */
+
+/* ==========================================================================
+   WORKSPACE OVERVIEW
+   Three bands: the programme brief (which Pack is in force + what the runs
+   found), the session log, and the header's overflow menu.
+
+   SPECIFICITY NOTE — this file is imported into `layer(components)` on line 10
+   of globals.css, i.e. BEFORE globals opens the same layer. Within one layer
+   source order breaks ties, so a bare `.sess-row` here would LOSE to globals'
+   `.sess-row`. Everything that re-declares a shared class is therefore scoped
+   under a `.wk-*` ancestor, which wins on specificity instead of order. Same
+   rule inside the media queries — globals ships its own 640px `.sess-row` grid.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1 · Header overflow menu — reuses the .accmenu / .acc-item / .acc-sep chrome
+   the account menu already established, anchored to the ⋯ trigger.
+   -------------------------------------------------------------------------- */
+
+.wk-menu { position: relative; display: inline-flex }
+.wk-menu .accmenu { top: calc(100% + var(--s2)); width: 236px }
+.wk-menu .acc-item { cursor: pointer }
+.wk-menu .acc-item .ic { color: var(--ink-3) }
+.wk-menu .acc-item.dgr .ic { color: var(--danger) }
+/* Keyboard focus has to read as strongly as hover: the menu is driven by arrow
+   keys, so the focused row IS the selection. */
+.wk-menu .acc-item:focus-visible { background: var(--wash-1); color: var(--ink); outline-offset: -2px }
+.wk-menu .acc-item.dgr:focus-visible { background: var(--danger-soft); color: var(--danger) }
+.wk-menu .acc-item .lbl { flex: 1; min-width: 0 }
+.wk-menu .acc-foot {
+  padding: var(--s2) var(--s3) var(--s1);
+  font-size: var(--t-2xs); line-height: var(--lh-snug); color: var(--ink-3);
+}
+
+/* --------------------------------------------------------------------------
+   2 · Programme brief — the Pack in force beside the evidence it has produced.
+   -------------------------------------------------------------------------- */
+
+.wk-brief {
+  display: grid; grid-template-columns: minmax(0, 1.32fr) minmax(0, 1fr);
+  gap: var(--s5); align-items: stretch;
+}
+.wk-brief > * { min-width: 0 }
+.wk-col { display: flex; flex-direction: column }
+.wk-body { display: flex; flex-direction: column; gap: var(--s4); flex: 1; padding: var(--s5) }
+.wk-foot { margin-top: auto; display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; padding-top: var(--s1) }
+
+.wk-edit { max-width: 620px; margin-bottom: var(--s6) }
+.wk-edit .flbl-wrap { margin-top: var(--s1) }
+
+.wk-pack-id { display: flex; align-items: flex-start; gap: var(--s4) }
+.wk-pack-txt { display: block; min-width: 0 }
+.wk-pack-mark {
+  display: grid; place-items: center; flex: none;
+  width: 38px; height: 38px; border-radius: var(--r-ctl);
+  background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-line);
+}
+.wk-pack-name {
+  display: block; font-size: var(--t-lg); font-weight: var(--w-sb);
+  letter-spacing: var(--tr-tight); line-height: var(--lh-snug);
+}
+.wk-pack-sub {
+  display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap;
+  margin-top: var(--s2); font-size: var(--t-sm); color: var(--ink-3);
+}
+.wk-note { font-size: var(--t-sm); line-height: var(--lh-body); color: var(--ink-2) }
+.wk-sub-lbl {
+  font-size: var(--t-xs); font-weight: var(--w-bd); letter-spacing: var(--tr-wide);
+  text-transform: uppercase; color: var(--ink-3);
+}
+.wk-more { font-size: var(--t-xs); color: var(--ink-3); padding-left: var(--s6) }
+
+/* --- the evidence meter: proportion first, then the three counts by name --- */
+.wk-ev { display: flex; flex-direction: column; gap: var(--s4); flex: 1 }
+.wk-ev-head { display: flex; align-items: baseline; gap: var(--s3); flex-wrap: wrap }
+/* Deliberately ink, not --ok: a rate is not good news at every value, and the
+   bar plus the named legend rows already carry the state colour. */
+.wk-ev-rate {
+  font-size: var(--t-2xl); font-weight: var(--w-sb); color: var(--ink);
+  letter-spacing: var(--tr-tightest); line-height: var(--lh-tight); font-variant-numeric: tabular-nums;
+}
+.wk-ev-of { font-size: var(--t-sm); color: var(--ink-3) }
+.wk-ev-bar {
+  display: flex; gap: 2px; height: 8px; overflow: hidden;
+  border-radius: 99px; background: var(--inset);
+}
+.wk-ev-bar i { display: block; height: 100%; min-width: 3px; border-radius: 99px }
+.wk-ev-bar i.ok { background: var(--ok) }
+.wk-ev-bar i.warn { background: var(--warn) }
+.wk-ev-bar i.dgr { background: var(--danger) }
+.wk-ev-legend { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: var(--s2) }
+.wk-ev-legend li { display: flex; align-items: center; gap: var(--s3); font-size: var(--t-sm); color: var(--ink-2) }
+.wk-ev-legend .sw { width: 9px; height: 9px; border-radius: 3px; flex: none; background: var(--ink-3) }
+.wk-ev-legend li.ok .sw { background: var(--ok) }
+.wk-ev-legend li.warn .sw { background: var(--warn) }
+.wk-ev-legend li.dgr .sw { background: var(--danger) }
+.wk-ev-legend .n {
+  margin-left: auto; font-family: var(--f-mono); font-size: var(--t-sm);
+  font-weight: var(--w-sb); color: var(--ink); font-variant-numeric: tabular-nums;
+}
+.wk-ev-blank { display: flex; flex-direction: column; gap: var(--s3); flex: 1 }
+.wk-ev-ic {
+  display: grid; place-items: center; width: 34px; height: 34px;
+  border-radius: var(--r-ctl); background: var(--inset); color: var(--ink-3);
+}
+
+/* --------------------------------------------------------------------------
+   3 · Session log — the shared .sess-* row, re-columned for a findings cell.
+   -------------------------------------------------------------------------- */
+
+.wk-sess { margin-top: var(--s7) }
+.wk-sess .sess-thead,
+.wk-sess .sess-row { grid-template-columns: 27px minmax(0, 1fr) 156px 96px 112px 16px }
+/* The row is a link, and `a { color: var(--accent) }` would paint every session
+   title accent-blue. Rows are text, not links-in-prose. */
+.wk-sess a.sess-row { color: var(--ink); text-decoration: none }
+.wk-sess .sess-thead span:nth-child(3) { text-align: left }
+.wk-sess .sess-thead span:nth-child(4) { text-align: right }
+.wk-sess .sess-ic.idle { background: var(--inset); color: var(--ink-3) }
+.wk-sess .sess-flag { text-align: right }
+/* A grid cell stretches by default, which made the status pill render as a wide
+   flat box with its label jammed left. A pill must hug its label. */
+.wk-sess .sess-row .pill { justify-self: start }
+/* A session that ran an older Pack version than the one now in force. The row's
+   aria-label says so in words; this is the visual half of the same signal. */
+/* Version drift is `<Stamp tone="warn">` now — the tone lives on the shared
+   primitive rather than as a one-off class here. */
+.wk-time {
+  display: block; margin-top: 1px; font-family: var(--f-mono);
+  font-size: var(--t-2xs); font-weight: var(--w-nm); color: var(--ink-3);
+}
+
+/* findings cell: the honest four states — counted, in flight, none, unreadable */
+.wk-find { display: flex; align-items: center; gap: var(--s2); min-width: 0; font-size: var(--t-xs); color: var(--ink-3) }
+.wk-find .ic { flex: none }
+.wk-find .n { font-weight: var(--w-sb); font-variant-numeric: tabular-nums }
+.wk-find.is-clean { color: var(--ok) }
+
+.wk-hd-actions { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap }
+.wk-filter-lbl { font-size: var(--t-xs); font-weight: var(--w-sb); color: var(--ink-3) }
+.wk-none {
+  display: flex; align-items: center; justify-content: center; gap: var(--s4);
+  flex-wrap: wrap; padding: var(--s7) var(--s5); text-align: center;
+  font-size: var(--t-sm); color: var(--ink-3);
+}
+
+/* --------------------------------------------------------------------------
+   4 · Responsive. 1160 tightens the log; 980 stacks the brief; 640 turns each
+   session row into three stacked lines (globals' own 640 rule is a 3-column
+   variant of the 5-column desktop row, so this restates it for 6 cells).
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 1160px) {
+  .wk-sess .sess-thead,
+  .wk-sess .sess-row { grid-template-columns: 27px minmax(0, 1fr) 122px 86px 104px 16px }
+}
+
+@media (max-width: 980px) {
+  .wk-brief { grid-template-columns: 1fr }
+}
+
+@media (max-width: 640px) {
+  .wk-sess .sess-thead { display: none }
+  .wk-sess .sess-row { grid-template-columns: 28px minmax(0, 1fr) auto; gap: var(--s2) var(--s4); padding: var(--s4) }
+  .wk-sess .sess-row .sess-ic { grid-column: 1; grid-row: 1 }
+  .wk-sess .sess-row .sess-main { grid-column: 2; grid-row: 1 }
+  .wk-sess .sess-row .pill { grid-column: 3; grid-row: 1; justify-self: end }
+  .wk-sess .sess-row .wk-find { grid-column: 2; grid-row: 2 }
+  .wk-sess .sess-row .sess-flag { grid-column: 2; grid-row: 3; text-align: left }
+  .wk-sess .sess-row .sess-chev { grid-column: 3; grid-row: 3; align-self: end }
+  .wk-sess .sess-row .wk-time { display: inline; margin-top: 0; margin-left: var(--s2) }
+  .wk-menu .accmenu { width: 214px }
+  .wk-hd-actions { width: 100% }
+  .wk-hd-actions .seg { flex: 1 }
+  .wk-more { padding-left: 0 }
+}

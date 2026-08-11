@@ -1,0 +1,140 @@
+/* app/shell.css — owned by the shell surface. Imported into the `components` cascade layer
+   by app/globals.css. Tokens live in globals.css §1; never hardcode a colour
+   here, and never redefine a token.
+
+   Two rail behaviours live in this file, and they are deliberately separate:
+
+     · ≤980px  the rail is an off-canvas drawer (globals.css §16 owns that);
+     · ≥981px  the rail can be COLLAPSED to icons only. The state is persisted in
+               localStorage and projected onto <html data-rail> by components/rail.ts,
+               with an inline bootstrap emitted ahead of the markup so a collapsed
+               rail never paints wide first.
+
+   Only `[data-rail="collapsed"]` is styled. With no attribute — script blocked,
+   bootstrap removed, JS off — the rail renders exactly as it does today.
+
+   NOTE on specificity: this file is imported at the TOP of globals.css, so it sits
+   EARLIER in the same cascade layer and loses every tie. Collapsed rules therefore
+   carry an extra `.sidebar` (or `details`) to out-specify the base rule they
+   override, e.g. `.nav .ws-name` (0,2,0) needs (0,3,0) to beat it.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Top-bar rail toggle. `.iconbtn` supplies the chrome; this only governs where
+   the control appears. Below 980px the rail is a drawer and `.menuBtn` is the
+   control, so the collapse affordance goes away entirely.
+   -------------------------------------------------------------------------- */
+/* `.topbar` is not decoration here: `.iconbtn { display: inline-flex }` sits later
+   in this same cascade layer, so a bare `.railBtn` (equal specificity, earlier)
+   would lose and the button would stay visible in the mobile drawer's place. */
+.topbar .railBtn { display: inline-flex }
+
+/* The account page's activity counters sit flush inside a card, so they lose the
+   card's own rounding and gain a rule beneath them. Three columns, not the four
+   `.stats` assumes. */
+.acct-stats {
+  grid-template-columns: repeat(3, 1fr);
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+}
+@media (max-width: 640px) {
+  .acct-stats { grid-template-columns: 1fr 1fr }
+}
+
+@media (max-width: 980px) {
+  .topbar .railBtn { display: none }
+}
+
+/* --------------------------------------------------------------------------
+   Rail footer account chip — the app's single account affordance. The trigger is
+   a <summary> so the menu needs no JS; globals styles `details.accwrap > summary`
+   as a centred grid (correct for the old top-bar avatar), so the chip restates
+   its own row layout.
+   -------------------------------------------------------------------------- */
+.sidebar details.rail-acc > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  width: 100%;
+  cursor: pointer;
+}
+.sidebar .rail-acc-chev { margin-left: auto; color: var(--rail-ink-3) }
+.sidebar details.rail-acc[open] > summary { background: var(--rail-hover) }
+
+/* The menu opens UPWARD out of the footer, and is allowed to overhang the rail
+   so a collapsed (68px) rail still shows a readable menu. It is a `--surface`
+   panel that happens to live inside the dark rail, so it re-states the page ink:
+   inheriting `--rail-ink` from `.sidebar` would print near-white on white. */
+.sidebar .accmenu {
+  top: auto;
+  bottom: calc(100% + var(--s2));
+  left: 0;
+  right: auto;
+  width: 224px;
+  color: var(--ink);
+}
+
+/* --------------------------------------------------------------------------
+   Workspace monogram — the collapsed rail's identity for a workspace, which has
+   no icon of its own. Hidden while the rail is expanded (the name is there).
+   -------------------------------------------------------------------------- */
+.sidebar .ws-mono {
+  display: none;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--r-s);
+  background: var(--rail-well);
+  color: var(--rail-ink-2);
+  font-size: var(--t-xs);
+  font-weight: var(--w-sb);
+  letter-spacing: var(--tr-none);
+}
+.sidebar .nav-item.is-active .ws-mono {
+  background: color-mix(in srgb, var(--rail-active-mark) 26%, transparent);
+  color: var(--rail-active-ink);
+}
+
+/* ==========================================================================
+   COLLAPSED RAIL — desktop only.
+
+   Gated to ≥981px on purpose: `data-rail` lives on <html>, so an ungated block
+   would follow a desktop choice into the mobile drawer and leave a 276px drawer
+   with every label hidden.
+   ========================================================================== */
+@media (min-width: 981px) {
+  .sidebar { transition: width .16s ease }
+
+  /* `--rail-w` is read by `.sidebar { width: var(--rail-w) }` in globals.css §6.
+     Re-declaring the token ON the rail changes only the rail's own width. */
+  :root[data-rail="collapsed"] .sidebar { --rail-w: 68px }
+
+  :root[data-rail="collapsed"] .sidebar .brand { justify-content: center; padding: 0 }
+  :root[data-rail="collapsed"] .sidebar .brand-name { display: none }
+
+  :root[data-rail="collapsed"] .sidebar .nav-item {
+    justify-content: center;
+    gap: 0;
+    padding: var(--s3) 0;
+  }
+  :root[data-rail="collapsed"] .sidebar .nav-lbl,
+  :root[data-rail="collapsed"] .sidebar .nav-cap span,
+  :root[data-rail="collapsed"] .sidebar .nav .ws-name,
+  :root[data-rail="collapsed"] .sidebar .user-meta,
+  :root[data-rail="collapsed"] .sidebar .rail-acc-chev { display: none }
+
+  :root[data-rail="collapsed"] .sidebar .nav-cap { justify-content: center }
+  :root[data-rail="collapsed"] .sidebar .ws-mono { display: grid }
+
+  /* The pack-installed marker survives collapse as a corner dot on the monogram. */
+  :root[data-rail="collapsed"] .sidebar .ws-item { position: relative }
+  :root[data-rail="collapsed"] .sidebar .ws-dot {
+    position: absolute;
+    top: var(--s2);
+    right: var(--s4);
+    margin-left: 0;
+  }
+
+  :root[data-rail="collapsed"] .sidebar details.rail-acc > summary { justify-content: center }
+}

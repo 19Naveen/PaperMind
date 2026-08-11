@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { WorkspaceView } from '@/components/WorkspaceView';
+import { WorkspaceView, type SessionRunMap } from '@/components/WorkspaceView';
 import { ApiError, getRun, getWorkspace } from '@/lib/api';
 
 export default async function WorkspacePage({ params }: { params: Promise<{ id: string }> }) {
@@ -9,17 +9,30 @@ export default async function WorkspacePage({ params }: { params: Promise<{ id: 
     throw error;
   });
 
-  // Verified-rate + open-issues are computed from completed runs' facts, so the
-  // analytics strip shows real numbers (and '—' when nothing has run yet).
-  const completedRuns = await Promise.all(
-    workspace.sessions
-      .filter((s) => s.status === 'complete' && s.run_id)
-      .map((s) => getRun(s.run_id as string).catch(() => null)),
+  // Each session that has ever run points at exactly one run, so read them all
+  // (bounded by the workspace's own session count) rather than only the complete
+  // ones: a running session's stage and an old session's pinned Pack version are
+  // both facts the overview needs. A run we cannot read is simply left out of the
+  // map — the view renders that as "unavailable", never as a count of zero.
+  const withRun = workspace.sessions.filter((session) => session.run_id);
+  const fetched = await Promise.all(
+    withRun.map((session) => getRun(session.run_id as string).catch(() => null)),
   );
-  const facts = completedRuns.flatMap((r) => (r ? r.facts : []));
-  const verified = facts.filter((f) => f.state === 'verified').length;
-  const verifiedRate = facts.length ? Math.round((verified / facts.length) * 100) : null;
-  const issues = facts.length - verified;
 
-  return <WorkspaceView initial={workspace} verifiedRate={verifiedRate} issues={issues} />;
+  const runs: SessionRunMap = {};
+  withRun.forEach((session, index) => {
+    const run = fetched[index];
+    if (!run) return;
+    runs[session.id] = {
+      status: run.status,
+      stage: run.stage,
+      packVersion: run.pack_version,
+      verified: run.facts.filter((fact) => fact.state === 'verified').length,
+      unsupported: run.facts.filter((fact) => fact.state === 'unsupported').length,
+      missing: run.facts.filter((fact) => fact.state === 'missing').length,
+      total: run.facts.length,
+    };
+  });
+
+  return <WorkspaceView initial={workspace} runs={runs} />;
 }
