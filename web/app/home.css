@@ -1,0 +1,232 @@
+/* app/home.css — the portfolio overview.
+   Imported into the `components` cascade layer by app/globals.css. Tokens live in
+   globals.css §1; never hardcode a colour here.
+
+   This surface is deliberately NOT a card dashboard. A reviewer or compliance lead
+   opens it to answer three operational questions — what is running, what is
+   blocked, what is waiting on me — and then to get into the right workspace. So it
+   is a dense table with an exception rail, not a grid of tiles: a card grid shows
+   four or five workspaces per screen and hides every number that matters inside
+   prose, while a table shows twenty and lets the eye run down a column. */
+
+/* ---------------------------------------------------------------- header band */
+
+.ops-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--s5);
+  flex-wrap: wrap;
+  padding-bottom: var(--s5);
+  border-bottom: 1px solid var(--line);
+}
+.ops-title {
+  font-size: var(--t-xl);
+  font-weight: var(--w-sb);
+  letter-spacing: var(--tr-tightest);
+  line-height: var(--lh-tight);
+}
+.ops-sub {
+  margin-top: var(--s1);
+  font-size: var(--t-sm);
+  color: var(--ink-3);
+}
+.ops-actions { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap }
+
+/* ------------------------------------------------------- operational counters
+   A single hairline-separated band, not four boxed tiles. Exceptions come first
+   and are the only ones allowed colour — a number a reader must act on should not
+   have to compete with three that are merely true. */
+
+.ops-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  margin: var(--s6) 0 var(--s7);
+}
+.ops-metric {
+  padding: 0 var(--s6);
+  border-left: 1px solid var(--line);
+  min-width: 116px;
+}
+.ops-metric:first-child { padding-left: 0; border-left: 0 }
+.ops-metric .m-l {
+  display: block;
+  font-size: var(--t-2xs);
+  font-weight: var(--w-bd);
+  letter-spacing: var(--tr-wider);
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.ops-metric .m-v {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s2);
+  margin-top: var(--s2);
+  font-size: var(--t-xl);
+  font-weight: var(--w-sb);
+  letter-spacing: var(--tr-tightest);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.ops-metric .m-q { font-size: var(--t-xs); font-weight: var(--w-md); color: var(--ink-3); letter-spacing: 0 }
+.ops-metric.is-attention .m-v { color: var(--warn) }
+.ops-metric.is-failed .m-v { color: var(--danger) }
+.ops-metric.is-zero .m-v { color: var(--ink-3) }
+
+/* -------------------------------------------------------------------- structure
+   The table gets the full width. It was previously squeezed into a 1fr column
+   beside a 316px rail, and with eight nowrap columns that clipped four of them —
+   including "Failed", which is the one number a lead is looking for. The two lists
+   sit BELOW it, side by side, where they also stop out-running the table's height
+   and inverting the page's hierarchy. */
+
+.ops-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s6);
+  align-items: start;
+  margin-top: var(--s6);
+}
+
+/* ------------------------------------------------------------------- the table */
+
+.ops-panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card) }
+/* A table must scroll rather than be cropped: `overflow: hidden` on the panel is
+   what silently ate the last four columns. */
+.ops-tablewrap { overflow-x: auto; border-radius: 0 0 var(--r-card) var(--r-card) }
+.ops-panel-hd {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  padding: var(--s4) var(--s5);
+  border-bottom: 1px solid var(--line);
+  border-radius: var(--r-card) var(--r-card) 0 0;
+}
+.ops-panel-hd h2 { font-size: var(--t-md); font-weight: var(--w-sb) }
+.ops-panel-hd .count { font-family: var(--f-mono); font-size: var(--t-xs); color: var(--ink-3) }
+.ops-filter { margin-left: auto; position: relative; flex: 0 1 232px; min-width: 150px }
+.ops-filter .ic { position: absolute; left: var(--s4); top: 9px; color: var(--ink-3); pointer-events: none }
+.ops-filter .input { height: 32px; padding-left: 34px; font-size: var(--t-sm) }
+
+.ops-table { width: 100%; min-width: 940px; border-collapse: separate; border-spacing: 0; font-size: var(--t-sm) }
+.ops-table th {
+  padding: var(--s3) var(--s5);
+  text-align: left;
+  white-space: nowrap;
+  font-family: var(--f-mono);
+  font-size: var(--t-2xs);
+  font-weight: var(--w-bd);
+  letter-spacing: var(--tr-wide);
+  text-transform: uppercase;
+  color: var(--ink-3);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line-2);
+}
+.ops-table td { padding: var(--s4) var(--s5); border-bottom: 1px solid var(--line); vertical-align: middle }
+.ops-table tbody tr:last-child td { border-bottom: 0 }
+.ops-table tbody tr:hover td { background: var(--surface-2) }
+.ops-table tbody tr:focus-within td { background: var(--surface-2) }
+/* Numeric columns are read down, so they are right-aligned and tabular. Tighter
+   horizontal padding than the text columns — four count columns at the text
+   padding pushed the table 10px past its container and made it scroll. */
+.ops-table th.n, .ops-table td.n {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  width: 1%;
+  white-space: nowrap;
+  padding-left: var(--s4);
+  padding-right: var(--s4);
+}
+.ops-table th.t, .ops-table td.t { width: 1%; white-space: nowrap }
+
+.ops-name { display: flex; flex-direction: column; gap: 2px; min-width: 0 }
+.ops-name a {
+  font-size: var(--t-base);
+  font-weight: var(--w-sb);
+  color: var(--ink);
+  letter-spacing: var(--tr-tight);
+}
+.ops-name a:hover { color: var(--accent) }
+.ops-name a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px }
+.ops-goal {
+  font-size: var(--t-xs);
+  color: var(--ink-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 52ch;
+}
+.ops-pack { display: flex; align-items: center; gap: var(--s2); color: var(--ink-2); white-space: nowrap }
+.ops-pack .ic { color: var(--ink-3) }
+.ops-nopack { color: var(--ink-3) }
+/* A count of zero is context, not a result — it must not read as loudly as a real
+   figure, or every fresh workspace looks like a wall of failures. */
+.ops-table td.n .z { color: var(--ink-3) }
+.ops-table td.n .w { color: var(--warn); font-weight: var(--w-sb) }
+.ops-table td.n .d { color: var(--danger); font-weight: var(--w-sb) }
+.ops-when { font-family: var(--f-mono); font-size: var(--t-2xs); color: var(--ink-3); white-space: nowrap }
+.ops-chev { color: var(--line-2) }
+.ops-table tbody tr:hover .ops-chev { color: var(--ink-3) }
+
+/* --------------------------------------------------------------- exception rail */
+
+.ops-rail { display: flex; flex-direction: column; gap: var(--s5) }
+.ops-list { list-style: none; margin: 0; padding: 0 }
+.ops-list li { border-bottom: 1px solid var(--line) }
+.ops-list li:last-child { border-bottom: 0 }
+.ops-row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--s3);
+  padding: var(--s3) var(--s5);
+  width: 100%;
+  text-align: left;
+  transition: background-color .12s;
+}
+.ops-row:hover { background: var(--surface-2) }
+.ops-row .g { justify-self: center; align-self: center }
+.ops-row .g.ok { color: var(--ok) }
+.ops-row .g.run { color: var(--accent) }
+.ops-row .g.warn { color: var(--warn) }
+.ops-row .g.dgr { color: var(--danger) }
+.ops-row .g.idle { color: var(--ink-3) }
+.ops-row b { font-size: var(--t-sm); font-weight: var(--w-sb); color: var(--ink); display: block }
+.ops-row small { font-size: var(--t-xs); color: var(--ink-3); display: block; margin-top: 1px }
+.ops-row time { font-family: var(--f-mono); font-size: var(--t-2xs); color: var(--ink-3); white-space: nowrap }
+.ops-empty { padding: var(--s5); font-size: var(--t-sm); color: var(--ink-3) }
+
+/* ------------------------------------------------------------------ responsive */
+
+@media (max-width: 1020px) {
+  .ops-split { grid-template-columns: 1fr }
+}
+
+@media (max-width: 760px) {
+  /* Stacked records need no minimum width — the table stops being a table. */
+  .ops-table { min-width: 0 }
+  .ops-tablewrap { overflow-x: visible }
+  .ops-metrics { margin: var(--s5) 0 var(--s6) }
+  .ops-metric { padding: 0 var(--s5); min-width: 96px }
+  .ops-metric .m-v { font-size: var(--t-lg) }
+  /* The table becomes a stack of records: each row keeps its own label column so a
+     number is never orphaned from what it counts. */
+  .ops-table thead { display: none }
+  .ops-table, .ops-table tbody, .ops-table tr, .ops-table td { display: block; width: auto }
+  .ops-table tbody tr { padding: var(--s4) var(--s5); border-bottom: 1px solid var(--line) }
+  .ops-table tbody tr:last-child { border-bottom: 0 }
+  .ops-table td { border-bottom: 0; padding: 0 }
+  .ops-table td + td { margin-top: var(--s2) }
+  .ops-table td.n, .ops-table td.t { text-align: left; width: auto }
+  .ops-table td[data-label]::before {
+    content: attr(data-label) "  ";
+    font-family: var(--f-mono);
+    font-size: var(--t-2xs);
+    letter-spacing: var(--tr-wide);
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin-right: var(--s2);
+  }
+  .ops-table td.chev { display: none }
+  .ops-goal { max-width: none; white-space: normal }
+}

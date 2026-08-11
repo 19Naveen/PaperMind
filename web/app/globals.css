@@ -18,6 +18,7 @@
    layers are ordered by first appearance, and naming them by hand risks putting
    a new layer after `utilities` and quietly breaking every utility class. */
 @import "./shell.css" layer(components);
+@import "./home.css" layer(components);
 @import "./studio.css" layer(components);
 @import "./session.css" layer(components);
 @import "./workspace.css" layer(components);
